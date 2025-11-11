@@ -9,7 +9,7 @@ require('dotenv').config(); // 1. Đọc file .env
 
 // 2. IMPORT HÀM TỪ SERVICE (SỬA LẠI CHỖ NÀY)
 // Hứng lấy hàm "login" mà file service đã export
-const { Login } = require('./service/authService.js');
+const { Login } = require('./service/auth.js');
 
 // 3. BIẾN GIỮ KẾT NỐI (appPool)
 let appPool = null;
@@ -63,6 +63,26 @@ app.post('/login', async (req, res) => {
 
 // (Thêm các API khác như app.get('/phim', ...) ở đây)
 // Nhớ là các API này phải kiểm tra "if (!appPool) { ... }"
+
+// homepage
+const { getDashboardStats } = require('./service/dashboardService.js');
+ư;
+app.get('/home', async (req, res) => {
+  // 1. Kiểm tra login
+  if (!appPool) {
+    return res.status(401).json({ message: 'Bạn chưa đăng nhập!' });
+  }
+
+  try {
+    // 2. Gọi service để lấy TẤT CẢ thông tin
+    const stats = await getDashboardStats(appPool);
+
+    // 3. Trả về 1 cục JSON chứa tất cả
+    res.status(200).json(stats);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // === KHỞI ĐỘNG SERVER ===
 app.listen(PORT, () => {
