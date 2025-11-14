@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = 'http://localhost:5000';
 
 export interface LoginCredentials {
   username: string;
@@ -11,8 +11,10 @@ export interface LoginResponse {
   [key: string]: any;
 }
 
-export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
-  const url = `${API_BASE.replace(/\/$/, '')}/login`;
+export async function login(
+  credentials: LoginCredentials
+): Promise<LoginResponse> {
+  const url = `${API_BASE.replace(/\/$/, '')}/auth/login`;
 
   const res = await fetch(url, {
     method: 'POST',
