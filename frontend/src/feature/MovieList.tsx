@@ -79,7 +79,7 @@ export default function MoviesList() {
     subtitles: '',
     dubbing: '',
     releaseDate: '', // Sẽ có dạng 'YYYY-MM-DD' từ input type="date"
-    status: 'Đang chiếu',
+    status: '',
     TrailerURl: '',
     PosterURL: '',
     AgeLimit: '',
@@ -110,7 +110,7 @@ export default function MoviesList() {
       color: '#495954ff',
     },
   ];
-
+  //xem danh sách phim
   const fetchMovies = async () => {
     setLoading(true);
     try {
@@ -126,53 +126,35 @@ export default function MoviesList() {
       setLoading(false);
     }
   };
-  const handleSubmit = (e: React.FormEvent) => {
+
+  // thêm phim mới
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (editingMovie) {
-      setMovies(
-        movies.map((m) =>
-          m.id === editingMovie.id
-            ? {
-                ...m,
-                name: formData.name,
-                description: formData.description,
-                duration: Number(formData.duration),
-                origin: formData.origin,
-                type: formData.type,
-                subtitles: formData.subtitles,
-                dubbing: formData.dubbing,
-                releaseDate: new Date(formData.releaseDate), // Chuyển string từ form về Date
-                status: formData.status,
-                TrailerURl: formData.TrailerURl,
-                PosterURL: formData.PosterURL,
-                AgeLimit: Number(formData.AgeLimit),
-              }
-            : m
-        )
-      );
+      try {
+        await axios.put(
+          `http://localhost:5000/phim/update/${editingMovie.id}`,
+          formData
+        );
+        fetchMovies();
+        resetForm();
+      } catch (error) {
+        console.error('Lỗi khi cập nhật phim:', error);
+        alert('Lỗi khi cập nhật phim! Vui lòng kiểm tra lại dữ liệu.');
+      }
     } else {
-      const newMovie: Movie = {
-        id: Math.floor(Math.random() * 10000) + 1, // ID tạm thời
-        name: formData.name,
-        description: formData.description,
-        duration: Number(formData.duration),
-        origin: formData.origin,
-        type: formData.type,
-        subtitles: formData.subtitles,
-        dubbing: formData.dubbing,
-        releaseDate: new Date(formData.releaseDate), // Chuyển string từ form về Date
-        status: formData.status,
-        TrailerURl: formData.TrailerURl,
-        PosterURL: formData.PosterURL,
-        AgeLimit: Number(formData.AgeLimit),
-      };
-      setMovies([...movies, newMovie]);
+      try {
+        await axios.post('http://localhost:5000/phim/add', formData);
+        fetchMovies();
+        resetForm();
+      } catch (error) {
+        console.error('Lỗi khi thêm phim:', error);
+        alert('Lỗi khi thêm phim! Vui lòng kiểm tra lại dữ liệu.');
+      }
     }
-
-    resetForm();
   };
-
+  // sửa phim gọi lại submit
   const handleEdit = (movie: Movie) => {
     setEditingMovie(movie);
     setFormData({
@@ -183,7 +165,9 @@ export default function MoviesList() {
       type: movie.type,
       subtitles: movie.subtitles,
       dubbing: movie.dubbing,
-      releaseDate: movie.releaseDate.toISOString().split('T')[0],
+      releaseDate: movie.releaseDate
+        ? new Date(movie.releaseDate).toISOString().split('T')[0]
+        : '',
       status: movie.status,
       TrailerURl: movie.TrailerURl,
       PosterURL: movie.PosterURL,
@@ -192,9 +176,15 @@ export default function MoviesList() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Bạn có chắc chắn muốn xóa phim này?')) {
-      setMovies(movies.filter((m) => m.id !== id));
+      try {
+        await axios.delete(`http://localhost:5000/phim/delete/${id}`);
+        fetchMovies();
+      } catch (error) {
+        console.error('Lỗi khi xóa phim:', error);
+        alert('Lỗi khi xóa phim! Vui lòng thử lại.');
+      }
     }
   };
 
@@ -208,7 +198,7 @@ export default function MoviesList() {
       subtitles: '',
       dubbing: '',
       releaseDate: '',
-      status: 'Đang chiếu',
+      status: '',
       TrailerURl: '',
       PosterURL: '',
       AgeLimit: '',
