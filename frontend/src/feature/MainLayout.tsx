@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Film, LayoutDashboard, Clapperboard, ShoppingBag, Receipt, Calendar, LogOut, Menu, X, Ticket } from "lucide-react";
+import { Film, LayoutDashboard, Clapperboard, ShoppingBag, Receipt, Calendar, LogOut, Menu, X, Ticket, Users } from "lucide-react";
 import { Button } from "../components/ui/button";
 
 interface MainLayoutProps {
@@ -19,6 +19,7 @@ export default function MainLayout({ children, currentPage, onNavigate, onLogout
     { id: "invoices", label: "Hóa đơn", icon: Receipt },
     { id: "vouchers", label: "Phát hành voucher", icon: Ticket },
     { id: "showtimes", label: "Suất chiếu", icon: Calendar },
+    { id: "users", label: "Quản lý người dùng", icon: Users },
   ];
 
   return (

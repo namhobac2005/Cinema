@@ -1,0 +1,579 @@
+import { useEffect, useState } from "react";
+import { Users, UserCheck, TrendingUp, DollarSign, Search, Calendar, Award, ArrowUpDown} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Badge } from "../components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { fetchCustomers, fetchEmployees } from "../api/users";
+
+interface Customer {
+  id: string;
+  name: string;
+  membershipTier: string;
+  points: number;
+}
+
+interface Employee {
+  id: string;
+  name: string;
+  joinDate: string;
+  salary: number;
+}
+
+export default function UsersPage() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("customers");
+  const [customerSort, setCustomerSort] = useState<'points' | 'id'>('points');
+  const [employeeSort, setEmployeeSort] = useState<'salary' | 'id'>('salary');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadUsers() {
+      try {
+        setLoading(true);
+        const [customerData, employeeData] = await Promise.all([
+          fetchCustomers(),
+          fetchEmployees(),
+        ]);
+
+        if (!isMounted) return;
+        setCustomers(customerData);
+        setEmployees(employeeData);
+        setError(null);
+      } catch (err) {
+        if (!isMounted) return;
+        const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu người dùng';
+        setError(message);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadUsers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // helper to compare IDs: try numeric comparison of digits in id, fallback to localeCompare
+  const compareById = (aId: string, bId: string) => {
+    const aNumMatch = aId.match(/\d+/);
+    const bNumMatch = bId.match(/\d+/);
+    if (aNumMatch && bNumMatch) {
+      const aNum = parseInt(aNumMatch[0], 10);
+      const bNum = parseInt(bNumMatch[0], 10);
+      return aNum - bNum;
+    }
+    return aId.localeCompare(bId, undefined, { numeric: true, sensitivity: 'base' });
+  };
+
+  // Sorted customers based on user selection
+  const sortedCustomers = [...customers].sort((a, b) => {
+    if (customerSort === 'points') return b.points - a.points;
+    return compareById(a.id, b.id);
+  });
+
+  // Sorted employees based on user selection
+  const sortedEmployees = [...employees].sort((a, b) => {
+    if (employeeSort === 'salary') return b.salary - a.salary;
+    return compareById(a.id, b.id);
+  });
+
+  // Filter customers
+  const filteredCustomers = sortedCustomers.filter(
+    (customer) =>
+      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.id.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Filter employees
+  const filteredEmployees = sortedEmployees.filter(
+    (employee) =>
+      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.id.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const getMembershipBadge = (tier: string) => {
+    switch (tier) {
+      case "Platinum":
+        return (
+          <Badge className="bg-[#E5E4E2]/20 text-[#E5E4E2] border-[#E5E4E2]/30">
+            <Award className="w-3 h-3 mr-1" />
+            Platinum
+          </Badge>
+        );
+      case "Gold":
+        return (
+          <Badge className="bg-[#FFC107]/20 text-[#FFC107] border-[#FFC107]/30">
+            <Award className="w-3 h-3 mr-1" />
+            Gold
+          </Badge>
+        );
+      case "Silver":
+        return (
+          <Badge className="bg-[#C0C0C0]/20 text-[#C0C0C0] border-[#C0C0C0]/30">
+            <Award className="w-3 h-3 mr-1" />
+            Silver
+          </Badge>
+        );
+      case "Bronze":
+        return (
+          <Badge className="bg-[#CD7F32]/20 text-[#CD7F32] border-[#CD7F32]/30">
+            <Award className="w-3 h-3 mr-1" />
+            Bronze
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const customerStats = (() => {
+    const total = customers.length;
+    const totalPoints = customers.reduce((sum, c) => sum + c.points, 0);
+    const averagePoints = total ? Math.round(totalPoints / total) : 0;
+    const platinum = customers.filter((c) => c.membershipTier === "Platinum").length;
+    return { total, totalPoints, averagePoints, platinum };
+  })();
+
+  const employeeStats = (() => {
+    const total = employees.length;
+    const totalSalary = employees.reduce((sum, e) => sum + e.salary, 0);
+    const averageSalary = total ? Math.round(totalSalary / total) : 0;
+    const recent = employees.filter((e) => {
+      const parts = e.joinDate.split("/");
+      const year = parseInt(parts[2], 10);
+      return Number.isFinite(year) && year >= 2023;
+    }).length;
+    return { total, totalSalary, averageSalary, recent };
+  })();
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl mb-2" style={{ color: "#E5E7EB" }}>
+          Quản lý người dùng
+        </h1>
+        <p style={{ color: "#9CA3AF" }}>
+          Quản lý thông tin khách hàng và nhân viên
+        </p>
+      </div>
+
+      {error && (
+        <div className="border border-red-500/40 bg-red-500/10 text-red-200 px-4 py-3 rounded-lg">
+          Không thể tải dữ liệu: {error}
+        </div>
+      )}
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-[#0F1629] border border-[#8B5CF6]/20 rounded-full p-1 inline-flex gap-1">
+          <TabsTrigger
+            value="customers"
+            className={
+              `rounded-full px-4 py-2 flex items-center gap-2 text-sm transition whitespace-nowrap ` +
+              (activeTab === "customers"
+                ? "bg-[#8B5CF6] text-white shadow-lg"
+                : "text-[#9CA3AF] hover:bg-[#0F1629]/40")
+            }
+          >
+            <Users className="w-4 h-4" />
+            Khách hàng
+          </TabsTrigger>
+          <TabsTrigger
+            value="employees"
+            className={
+              `rounded-full px-4 py-2 flex items-center gap-2 text-sm transition whitespace-nowrap ` +
+              (activeTab === "employees"
+                ? "bg-[#8B5CF6] text-white shadow-lg"
+                : "text-[#9CA3AF] hover:bg-[#0F1629]/40")
+            }
+          >
+            <UserCheck className="w-4 h-4" />
+            Nhân viên
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Customers Tab */}
+        <TabsContent value="customers" className="space-y-6 mt-6">
+          {loading && (
+            <div className="text-center text-sm" style={{ color: "#9CA3AF" }}>
+              Đang tải dữ liệu khách hàng...
+            </div>
+          )}
+          {/* Customer Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border-[#8B5CF6]/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="p-3 rounded-lg"
+                    style={{ backgroundColor: "#8B5CF620" }}
+                  >
+                    <Users className="w-6 h-6" style={{ color: "#8B5CF6" }} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm mb-1" style={{ color: "#9CA3AF" }}>
+                    Tổng khách hàng
+                  </p>
+                  <p className="text-2xl" style={{ color: "#8B5CF6" }}>
+                    {customerStats.total}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-[#8B5CF6]/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="p-3 rounded-lg"
+                    style={{ backgroundColor: "#FFC10720" }}
+                  >
+                    <TrendingUp className="w-6 h-6" style={{ color: "#FFC107" }} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm mb-1" style={{ color: "#9CA3AF" }}>
+                    Tổng điểm tích lũy
+                  </p>
+                  <p className="text-2xl" style={{ color: "#FFC107" }}>
+                    {customerStats.totalPoints.toLocaleString("vi-VN")}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-[#8B5CF6]/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="p-3 rounded-lg"
+                    style={{ backgroundColor: "#10B98120" }}
+                  >
+                    <Award className="w-6 h-6" style={{ color: "#10B981" }} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm mb-1" style={{ color: "#9CA3AF" }}>
+                    Điểm TB/khách
+                  </p>
+                  <p className="text-2xl" style={{ color: "#10B981" }}>
+                    {customerStats.averagePoints.toLocaleString("vi-VN")}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-[#8B5CF6]/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="p-3 rounded-lg"
+                    style={{ backgroundColor: "#E5E4E220" }}
+                  >
+                    <Award className="w-6 h-6" style={{ color: "#E5E4E2" }} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm mb-1" style={{ color: "#9CA3AF" }}>
+                    Hạng Platinum
+                  </p>
+                  <p className="text-2xl" style={{ color: "#E5E4E2" }}>
+                    {customerStats.platinum}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Customers Table */}
+          <Card className="border-[#8B5CF6]/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle style={{ color: "#E5E7EB" }}>
+                  Danh sách khách hàng
+                </CardTitle>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="w-4 h-4" style={{ color: "#9CA3AF" }} />
+                    <Select
+                      value={customerSort}
+                      onValueChange={(value: "points" | "id") => setCustomerSort(value)}
+                    >
+                      <SelectTrigger className="w-44 bg-[#0F1629] border-[#8B5CF6]/30 focus:border-[#FFC107]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1C253A] border-[#8B5CF6]/30">
+                        <SelectItem
+                          value="points"
+                          className="text-[#E5E7EB] focus:bg-[#8B5CF6]/20"
+                        >
+                          Sắp xếp theo điểm
+                        </SelectItem>
+                        <SelectItem
+                          value="id"
+                          className="text-[#E5E7EB] focus:bg-[#8B5CF6]/20"
+                        >
+                          Sắp xếp theo ID
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="relative w-64">
+                    <Search
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                      style={{ color: "#9CA3AF" }}
+                    />
+                    <Input
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Tìm kiếm khách hàng..."
+                      className="pl-10 bg-[#0F1629] border-[#8B5CF6]/30 focus:border-[#FFC107]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm mb-4" style={{ color: "#9CA3AF" }}>
+                💡 Sắp xếp theo điểm tích lũy (cao → thấp)
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-[#8B5CF6]/20 hover:bg-transparent">
+                    <TableHead style={{ color: "#9CA3AF" }}>ID</TableHead>
+                    <TableHead style={{ color: "#9CA3AF" }}>Tên khách hàng</TableHead>
+                    <TableHead style={{ color: "#9CA3AF" }}>Hạng thành viên</TableHead>
+                    <TableHead style={{ color: "#9CA3AF" }}>Điểm tích lũy</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCustomers.map((customer) => (
+                    <TableRow key={customer.id} className="border-[#8B5CF6]/20">
+                      <TableCell style={{ color: "#8B5CF6" }}>
+                        {customer.id}
+                      </TableCell>
+                      <TableCell style={{ color: "#E5E7EB" }}>
+                        {customer.name}
+                      </TableCell>
+                      <TableCell>
+                        {getMembershipBadge(customer.membershipTier)}
+                      </TableCell>
+                      <TableCell style={{ color: "#FFC107" }}>
+                        {customer.points.toLocaleString("vi-VN")} điểm
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {filteredCustomers.length === 0 && (
+                <div className="text-center py-8" style={{ color: "#9CA3AF" }}>
+                  Không tìm thấy khách hàng nào
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Employees Tab */}
+        <TabsContent value="employees" className="space-y-6 mt-6">
+          {loading && (
+            <div className="text-center text-sm" style={{ color: "#9CA3AF" }}>
+              Đang tải dữ liệu nhân viên...
+            </div>
+          )}
+          {/* Employee Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border-[#8B5CF6]/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="p-3 rounded-lg"
+                    style={{ backgroundColor: "#8B5CF620" }}
+                  >
+                    <UserCheck className="w-6 h-6" style={{ color: "#8B5CF6" }} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm mb-1" style={{ color: "#9CA3AF" }}>
+                    Tổng nhân viên
+                  </p>
+                  <p className="text-2xl" style={{ color: "#8B5CF6" }}>
+                    {employeeStats.total}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-[#8B5CF6]/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="p-3 rounded-lg"
+                    style={{ backgroundColor: "#FFC10720" }}
+                  >
+                    <DollarSign className="w-6 h-6" style={{ color: "#FFC107" }} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm mb-1" style={{ color: "#9CA3AF" }}>
+                    Tổng quỹ lương
+                  </p>
+                  <p className="text-2xl" style={{ color: "#FFC107" }}>
+                    {(employeeStats.totalSalary / 1000000).toFixed(0)}tr
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-[#8B5CF6]/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="p-3 rounded-lg"
+                    style={{ backgroundColor: "#10B98120" }}
+                  >
+                    <TrendingUp className="w-6 h-6" style={{ color: "#10B981" }} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm mb-1" style={{ color: "#9CA3AF" }}>
+                    Lương TB/người
+                  </p>
+                  <p className="text-2xl" style={{ color: "#10B981" }}>
+                    {(employeeStats.averageSalary / 1000000).toFixed(1)}tr
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-[#8B5CF6]/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="p-3 rounded-lg"
+                    style={{ backgroundColor: "#3B82F620" }}
+                  >
+                    <Calendar className="w-6 h-6" style={{ color: "#3B82F6" }} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm mb-1" style={{ color: "#9CA3AF" }}>
+                    NV mới (2023+)
+                  </p>
+                  <p className="text-2xl" style={{ color: "#3B82F6" }}>
+                    {employeeStats.recent}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Employees Table */}
+          <Card className="border-[#8B5CF6]/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle style={{ color: "#E5E7EB" }}>
+                  Danh sách nhân viên
+                </CardTitle>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                    <ArrowUpDown className="w-4 h-4" style={{ color: "#9CA3AF" }} />
+                    <Select
+                      value={employeeSort}
+                      onValueChange={(value: "salary" | "id") => setEmployeeSort(value)}
+                    >
+                      <SelectTrigger className="w-44 bg-[#0F1629] border-[#8B5CF6]/30 focus:border-[#FFC107]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1C253A] border-[#8B5CF6]/30">
+                        <SelectItem
+                          value="salary"
+                          className="text-[#E5E7EB] focus:bg-[#8B5CF6]/20"
+                        >
+                          Sắp xếp theo lương
+                        </SelectItem>
+                        <SelectItem
+                          value="id"
+                          className="text-[#E5E7EB] focus:bg-[#8B5CF6]/20"
+                        >
+                          Sắp xếp theo ID
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="relative w-64">
+                    <Search
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                      style={{ color: "#9CA3AF" }}
+                    />
+                    <Input
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Tìm kiếm nhân viên..."
+                      className="pl-10 bg-[#0F1629] border-[#8B5CF6]/30 focus:border-[#FFC107]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm mb-4" style={{ color: "#9CA3AF" }}>
+                💡 Sắp xếp theo lương (cao → thấp)
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-[#8B5CF6]/20 hover:bg-transparent">
+                    <TableHead style={{ color: "#9CA3AF" }}>ID</TableHead>
+                    <TableHead style={{ color: "#9CA3AF" }}>Tên nhân viên</TableHead>
+                    <TableHead style={{ color: "#9CA3AF" }}>Ngày gia nhập</TableHead>
+                    <TableHead style={{ color: "#9CA3AF" }}>Lương</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredEmployees.map((employee) => (
+                    <TableRow key={employee.id} className="border-[#8B5CF6]/20">
+                      <TableCell style={{ color: "#8B5CF6" }}>
+                        {employee.id}
+                      </TableCell>
+                      <TableCell style={{ color: "#E5E7EB" }}>
+                        {employee.name}
+                      </TableCell>
+                      <TableCell style={{ color: "#9CA3AF" }}>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          {employee.joinDate}
+                        </div>
+                      </TableCell>
+                      <TableCell style={{ color: "#FFC107" }}>
+                        {employee.salary.toLocaleString("vi-VN")}₫
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {filteredEmployees.length === 0 && (
+                <div className="text-center py-8" style={{ color: "#9CA3AF" }}>
+                  Không tìm thấy nhân viên nào
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
