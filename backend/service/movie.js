@@ -152,7 +152,7 @@ router.get('/list', async (req, res) => {
       FROM 
         PHIM
       WHERE 
-        TrangThaiPhim = 'DangChieu' OR TrangThaiPhim = 'SapChieu' -- Chỉ lấy phim có thể chiếu
+        TrangThaiPhim = 'DangChieu' OR TrangThaiPhim = 'SapChieu'
       ORDER BY 
         TenPhim
     `;
