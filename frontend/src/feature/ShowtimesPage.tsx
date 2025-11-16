@@ -5,9 +5,11 @@ import {
   Film,
   MapPin,
   Clock,
-  Armchair,
+  DoorOpen,
   Calendar,
-  Plus, // Thêm
+  Plus,
+  Trash2,
+  Pencil,
 } from 'lucide-react';
 import {
   Card,
@@ -15,11 +17,11 @@ import {
   CardHeader,
   CardTitle,
 } from '../components/ui/card';
-import { Button } from '../components/ui/button'; // Thêm
-import { Input } from '../components/ui/input'; // Thêm
-import { Label } from '../components/ui/label'; // Thêm
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import {
-  Dialog, // Thêm
+  Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -47,10 +49,14 @@ interface Showtime {
   startTime: string;
   movieName: string;
   status: 'DangMo' | 'DaDong' | 'DaHuy';
+  // cho update
+  MaPhim: number;
+  SoPhong: string;
+  MaRap: number;
 }
 interface Movie {
-  id: number; // Sửa lại: id (khớp với API /phim/list)
-  name: string; // Sửa lại: name (khớp với API /phim/list)
+  id: number;
+  name: string;
 }
 
 export default function ShowtimesPage() {
@@ -68,12 +74,14 @@ export default function ShowtimesPage() {
   const [loadingShowtimes, setLoadingShowtimes] = useState(false);
   const [loadingFormRooms, setLoadingFormRooms] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingShowtime, setingEditShowtime] = useState<Showtime | null>(null);
 
   const [formData, setFormData] = useState({
     MaPhim: '',
     MaPhong: '',
     MaRap: '',
     ThoiGianBatDau: '',
+    TrangThai: 'Đang mở',
   });
 
   useEffect(() => {
@@ -145,13 +153,6 @@ export default function ShowtimesPage() {
 
       fetchCinemasForForm();
       fetchMoviesForForm();
-      setRoomList([]);
-      setFormData({
-        MaPhim: '',
-        MaPhong: '',
-        MaRap: '',
-        ThoiGianBatDau: '',
-      });
     }
   }, [isAddDialogOpen]);
 
@@ -190,27 +191,87 @@ export default function ShowtimesPage() {
   };
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await axios.post('http://localhost:5000/suatchieu/add', {
-        ...formData,
-      });
-
-      alert('Thêm suất chiếu thành công!');
-      setIsAddDialogOpen(false);
-      if (
-        formData.MaRap === selectedCinemaId &&
-        formData.MaPhong === selectedRoomNo
-      ) {
+    if (editingShowtime) {
+      try {
+        await axios.put(
+          `http://localhost:5000/suatchieu/update/${editingShowtime.showtimeId}`,
+          {
+            ...formData,
+          }
+        );
+        alert('Cập nhật suất chiếu thành công!');
         fetchShowtimes();
+        setIsAddDialogOpen(false);
+        resetForm();
+      } catch (error) {
+        console.error('Lỗi khi cập nhật suất chiếu:', error);
+        if (axios.isAxiosError(error) && error.response?.status === 400) {
+          alert(`Lỗi: ${error.response.data.message}`);
+        } else {
+          alert('Lỗi! Cập nhật suất chiếu thất bại.');
+        }
       }
-    } catch (error) {
-      console.error('Lỗi khi thêm suất chiếu:', error);
-      if (axios.isAxiosError(error) && error.response?.status === 400) {
-        alert(`Lỗi: ${error.response.data.message}`);
-      } else {
-        alert('Lỗi! Thêm suất chiếu thất bại.');
+    } else {
+      try {
+        await axios.post('http://localhost:5000/suatchieu/add', {
+          ...formData,
+        });
+
+        alert('Thêm suất chiếu thành công!');
+        setIsAddDialogOpen(false);
+        resetForm();
+        if (
+          formData.MaRap === selectedCinemaId &&
+          formData.MaPhong === selectedRoomNo
+        ) {
+          fetchShowtimes();
+        }
+      } catch (error) {
+        console.error('Lỗi khi thêm suất chiếu:', error);
+        if (axios.isAxiosError(error) && error.response?.status === 400) {
+          alert(`Lỗi: ${error.response.data.message}`);
+        } else {
+          alert('Lỗi! Thêm suất chiếu thất bại.');
+        }
       }
     }
+  };
+
+  const handleDelete = async (showtimeId: number) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa suất chiếu này không?')) {
+      return;
+    }
+    setFormData({ ...formData });
+  };
+  const toLocalISOString = (date: Date) => {
+    const localDate = new Date(
+      date.getTime() - date.getTimezoneOffset() * 60000
+    );
+    const isoString = localDate.toISOString();
+    return isoString.slice(0, 16); // Cắt YYYY-MM-DDTHH:MM
+  };
+  const handleEditShowtime = (showtime: Showtime) => {
+    setingEditShowtime(showtime);
+    setFormData({
+      MaPhim: showtime.MaPhim.toString(),
+      MaPhong: showtime.SoPhong,
+      MaRap: showtime.MaRap.toString(),
+      ThoiGianBatDau: showtime.startTime
+        ? toLocalISOString(new Date(showtime.startTime))
+        : '',
+      TrangThai: showtime.status,
+    });
+    setIsAddDialogOpen(true);
+  };
+  const resetForm = () => {
+    setFormData({
+      MaPhim: '',
+      MaPhong: '',
+      MaRap: '',
+      ThoiGianBatDau: '',
+      TrangThai: 'DangMo',
+    });
+    setingEditShowtime(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -254,13 +315,25 @@ export default function ShowtimesPage() {
   return (
     <>
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl mb-2" style={{ color: '#E5E7EB' }}>
-            Suất chiếu
-          </h1>
-          <p style={{ color: '#9CA3AF' }}>
-            Quản lý suất chiếu theo rạp và phòng
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl mb-2" style={{ color: '#E5E7EB' }}>
+              Suất chiếu
+            </h1>
+            <p style={{ color: '#9CA3AF' }}>
+              Quản lý suất chiếu theo rạp và phòng
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              resetForm();
+              setIsAddDialogOpen(true);
+            }}
+            className="bg-[#FFC107] hover:bg-[#FFC107]/90 text-[#0F1629] shadow-lg"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Thêm suất chiếu mới
+          </Button>
         </div>
 
         <Card className="border-[#8B5CF6]/20">
@@ -298,7 +371,7 @@ export default function ShowtimesPage() {
                     style={{ color: '#9CA3AF' }}
                   />
                   <div className="flex items-center gap-2">
-                    <Armchair
+                    <DoorOpen
                       className="w-5 h-5"
                       style={{ color: '#FFC107' }}
                     />
@@ -351,7 +424,7 @@ export default function ShowtimesPage() {
             </div>
           </CardContent>
         </Card>
-
+        {/* card hiển thị suất chiếu */}
         {selectedRoomNo && showtimes.length > 0 && (
           <Card className="border-[#8B5CF6]/20">
             <CardHeader>
@@ -389,6 +462,31 @@ export default function ShowtimesPage() {
                         ID Suất: {showtime.showtimeId}
                       </span>
                     </div>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#8B5CF6]/20">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Ngăn Card cha bị click
+                          handleEditShowtime(showtime);
+                        }}
+                        className="text-blue-500 hover:bg-blue-500/10 hover:text-blue-500"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Ngăn Card cha bị click
+                          handleDelete(showtime.showtimeId);
+                        }}
+                        className="text-red-500 hover:bg-red-500/10 hover:text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -417,7 +515,7 @@ export default function ShowtimesPage() {
         {selectedCinemaId && !selectedRoomNo && !loadingRooms && (
           <Card className="border-[#8B5CF6]/20">
             <CardContent className="p-12 text-center">
-              <Armchair
+              <DoorOpen
                 className="w-16 h-16 mx-auto mb-4"
                 style={{ color: '#FFC107' }}
               />
@@ -447,25 +545,20 @@ export default function ShowtimesPage() {
             </CardContent>
           </Card>
         )}
-
-        <Button
-          onClick={() => setIsAddDialogOpen(true)}
-          className="bg-[#FFC107] hover:bg-[#FFC107]/90 text-[#0F1629] shadow-lg
-                     rounded-full w-16 h-16
-                     fixed bottom-8 right-8 z-50"
-        >
-          <Plus className="w-8 h-8" />
-        </Button>
       </div>
-
+      {/* Dialog thêm suất chiếu mới */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="bg-[#1C253A] border-[#8B5CF6]/30">
           <DialogHeader>
             <DialogTitle style={{ color: '#E5E7EB' }}>
-              Thêm suất chiếu mới
+              {editingShowtime
+                ? 'Chỉnh sửa thông tin suất chiếu '
+                : 'Thêm suất chiếu mới'}
             </DialogTitle>
             <DialogDescription style={{ color: '#9CA3AF' }}>
-              Điền thông tin để tạo suất chiếu mới
+              {editingShowtime
+                ? 'Cập nhật thông tin cho suất chiếu'
+                : 'Điền thông tin để tạo suất chiếu mới'}
             </DialogDescription>
           </DialogHeader>
 
@@ -549,26 +642,62 @@ export default function ShowtimesPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ThoiGianBatDau">Thời gian bắt đầu</Label>
-              <Input
-                id="ThoiGianBatDau"
-                type="datetime-local"
-                value={formData.ThoiGianBatDau}
-                onChange={(e) =>
-                  setFormData({ ...formData, ThoiGianBatDau: e.target.value })
-                }
-                required
-                className="bg-[#0F1629] border-[#8B5CF6]/30 focus:border-[#FFC107]"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ThoiGianBatDau">Thời gian bắt đầu</Label>
+                <Input
+                  id="ThoiGianBatDau"
+                  type="datetime-local"
+                  value={formData.ThoiGianBatDau}
+                  onChange={(e) =>
+                    setFormData({ ...formData, ThoiGianBatDau: e.target.value })
+                  }
+                  required
+                  className="bg-[#0F1629] border-[#8B5CF6]/30 focus:border-[#FFC107]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="TrangThai">Trạng Thái</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, TrangThai: value })
+                  }
+                  value={formData.TrangThai}
+                >
+                  <SelectTrigger className="bg-[#0F1629] border-[#8B5CF6]/30 focus:border-[#FFC107]">
+                    <SelectValue placeholder="Chọn trạng thái..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1C253A] border-[#8B5CF6]/30">
+                    <SelectItem
+                      value="DangMo"
+                      className="text-[#E5E7EB] focus:bg-[#8B5CF6]/20"
+                    >
+                      Đang mở
+                    </SelectItem>
+                    <SelectItem
+                      value="DaDong"
+                      className="text-[#E5E7EB] focus:bg-[#8B5CF6]/20"
+                    >
+                      Đã đóng
+                    </SelectItem>
+                    <SelectItem
+                      value="DaHuy"
+                      className="text-[#E5E7EB] focus:bg-[#8B5CF6]/20"
+                    >
+                      Đã hủy
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-
             <div className="flex gap-2 pt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsAddDialogOpen(false)}
+                onClick={() => {
+                  resetForm();
+                  setIsAddDialogOpen(false);
+                }}
                 className="flex-1 border-[#8B5CF6]/30 hover:bg-[#8B5CF6]/10"
               >
                 Hủy

@@ -88,7 +88,13 @@ router.get('/rap/:cinemaId/phongchieu/:roomNo', async (req, res) => {
     request.input('cinemaId', sql.Int, req.params.cinemaId);
     request.input('roomNo', sql.NVarChar, req.params.roomNo);
     const query = `
-    SELECT sc.ID AS showtimeId, sc.ThoiGianBatDau AS startTime, p.TenPhim AS movieName, sc.TrangThai AS status
+    SELECT sc.ID AS showtimeId,
+     sc.ThoiGianBatDau AS startTime,
+      p.TenPhim AS movieName,
+       sc.TrangThai AS status,
+       p.ID AS MaPhim,
+       sc.SoPhong AS SoPhong,
+        sc.Rap_ID AS MaRap
     FROM SuatChieu AS sc
     JOIN Phim AS p ON sc.Phim_ID = p.ID
     WHERE sc.SoPhong = @roomNo AND sc.Rap_ID = @cinemaId`;
@@ -148,4 +154,42 @@ router.post('/add', async (req, res) => {
   }
 });
 
+router.delete('/delete/:id', async (req, res) => {
+  try {
+    const pool = getPool();
+    const request = pool.request();
+    const showtimeId = req.params.id;
+    request.input('id', sql.Int, showtimeId);
+    const query = 'DELETE FROM SuatChieu WHERE ID = @id';
+    await request.query(query);
+    res.status(200).json({ message: 'Xóa suất chiếu thành công.' });
+  } catch (err) {
+    console.error('Lỗi khi xóa suất chiếu:', err);
+    res.status(500).json({ message: 'Lỗi server khi xóa suất chiếu.' });
+  }
+});
+
+router.put('/update/:id', async (req, res) => {
+  try {
+    const pool = getPool();
+    const request = pool.request();
+    const { id } = req.params;
+    const { ThoiGianBatDau, TrangThai, MaPhim } = req.body;
+    request.input('id', sql.Int, id);
+    request.input('ThoiGianBatDau', sql.DateTime, ThoiGianBatDau);
+    request.input('TrangThai', sql.NVarChar, TrangThai);
+    request.input('MaPhim', sql.Int, MaPhim);
+    const query = `
+    UPDATE SuatChieu
+    SET ThoiGianBatDau = @ThoiGianBatDau,
+        TrangThai = @TrangThai,
+        Phim_ID = @MaPhim
+    WHERE ID = @id`;
+    await request.query(query);
+    res.status(200).json({ message: 'Cập nhật suất chiếu thành công.' });
+  } catch (err) {
+    console.error('Lỗi khi cập nhật suất chiếu:', err);
+    res.status(500).json({ message: 'Lỗi server khi cập nhật suất chiếu.' });
+  }
+});
 module.exports = router;
