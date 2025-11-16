@@ -139,4 +139,29 @@ router.put('/update/:id', async (req, res) => {
     res.status(500).json({ message: 'Lỗi server khi cập nhật phim.' });
   }
 });
+// cho suất chiếu
+router.get('/list', async (req, res) => {
+  try {
+    const pool = getPool();
+    const request = pool.request();
+
+    const query = `
+      SELECT 
+        ID AS id, 
+        TenPhim AS name 
+      FROM 
+        PHIM
+      WHERE 
+        TrangThaiPhim = 'DangChieu' OR TrangThaiPhim = 'SapChieu' -- Chỉ lấy phim có thể chiếu
+      ORDER BY 
+        TenPhim
+    `;
+
+    const result = await request.query(query);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error('Lỗi khi lấy danh sách phim (list):', err.message);
+    res.status(500).json({ message: 'Lỗi server khi lấy danh sách phim' });
+  }
+});
 module.exports = router;

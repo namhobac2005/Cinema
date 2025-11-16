@@ -445,19 +445,19 @@ export default function MoviesList() {
                     </SelectTrigger>
                     <SelectContent className="bg-[#1C253A] border-[#8B5CF6]/30">
                       <SelectItem
-                        value="Đang chiếu"
+                        value="DangChieu"
                         className="text-[#E5E7EB] focus:bg-[#8B5CF6]/20"
                       >
                         Đang chiếu
                       </SelectItem>
                       <SelectItem
-                        value="Sắp chiếu"
+                        value="SapChieu"
                         className="text-[#E5E7EB] focus:bg-[#8B5CF6]/20"
                       >
                         Sắp chiếu
                       </SelectItem>
                       <SelectItem
-                        value="Ngừng chiếu"
+                        value="NgungChieu"
                         className="text-[#E5E7EB] focus:bg-[#8B5CF6]/20"
                       >
                         Ngừng chiếu
