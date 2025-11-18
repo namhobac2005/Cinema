@@ -1,42 +1,75 @@
-const API_BASE = 'http://localhost:5000';
+// src/api/auth.ts
 
-export interface LoginCredentials {
-  username: string;
-  password: string;
+export interface User {
+  id: number;
+  ten: string;
+  email: string | null;
+  phoneNum: string | null;
+  vaiTro: 'QuanLy' | 'NhanVien' | 'KhachHang';
 }
 
-export interface LoginResponse {
-  message?: string;
-  // add fields your backend returns (token, user, etc.)
-  [key: string]: any;
+interface AuthResponse {
+  message: string;
+  token: string;
+  user: User;
 }
 
-export async function login(
+interface LoginCredentials {
+  tenDangNhap: string;
+  matKhau: string;
+}
+
+const API_URL = 'http://localhost:5000/auth';
+
+export const login = async (
   credentials: LoginCredentials
-): Promise<LoginResponse> {
-  const url = `${API_BASE.replace(/\/$/, '')}/auth/login`;
-
-  const res = await fetch(url, {
+): Promise<AuthResponse> => {
+  const response = await fetch(`${API_URL}/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(credentials),
   });
 
-  // try to parse JSON safely
-  let data: any = null;
+  const data: AuthResponse | { message: string } = await response.json();
+
+  if (!response.ok) {
+    // Ném lỗi với message từ backend
+    throw new Error(
+      (data as { message: string }).message || 'Đăng nhập thất bại'
+    );
+  }
+
+  const authData = data as AuthResponse;
+
+  if (authData.token) {
+    localStorage.setItem('authToken', authData.token);
+  }
+  if (authData.user) {
+    localStorage.setItem('currentUser', JSON.stringify(authData.user));
+  }
+
+  return authData;
+};
+
+export const logout = (): void => {
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('currentUser');
+};
+
+export const getCurrentUser = (): User | null => {
+  const userJson = localStorage.getItem('currentUser');
+  if (!userJson) {
+    return null;
+  }
+
   try {
-    data = await res.json();
-  } catch (err) {
-    // non-json response
-    data = null;
+    const user: User = JSON.parse(userJson);
+    return user;
+  } catch (error) {
+    // Xóa item hỏng nếu parse lỗi
+    localStorage.removeItem('currentUser');
+    return null;
   }
-
-  if (!res.ok) {
-    const message = data?.message || res.statusText || 'Login failed';
-    throw new Error(message);
-  }
-
-  return data || { message: 'OK' };
-}
-
-export default { login };
+};

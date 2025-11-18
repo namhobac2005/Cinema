@@ -9,7 +9,7 @@ router.use((req, res, next) => {
     next();
   } catch (err) {
     res.status(401).json({
-      message: 'Chưa đăng nhập. Vui lòng đăng nhập trước khi gọi API.',
+      message: 'Chưa kết nối đến cơ sở dữ liệu.',
     });
   }
 });
