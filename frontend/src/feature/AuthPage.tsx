@@ -1,12 +1,17 @@
-import { useState } from "react";
-import { Film, Eye, EyeOff } from "lucide-react";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-// tabs removed — only login is needed
-import { ImageWithFallback } from "../components/figma/ImageWithFallback";
-import { login } from "../api/auth";
+import { useState } from 'react';
+import { Film, Eye, EyeOff } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card';
+import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { login } from '../api/auth';
 
 interface AuthPageProps {
   onLogin: () => void;
@@ -14,32 +19,34 @@ interface AuthPageProps {
 
 export default function AuthPage({ onLogin }: AuthPageProps) {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
-    if (!loginEmail || !loginPassword) {
-      setError('Vui lòng nhập email và mật khẩu.');
+    if (!loginIdentifier || !loginPassword) {
+      setError('Vui lòng nhập tên đăng nhập và mật khẩu.');
       return;
     }
 
     setLoading(true);
     try {
-      await login({ username: loginEmail, password: loginPassword });
-      // success: inform parent (App will show dashboard)
-      try { onLogin(); } catch {}
+      await login({
+        tenDangNhap: loginIdentifier,
+        matKhau: loginPassword,
+      });
+      try {
+        onLogin();
+      } catch {}
     } catch (err: any) {
       setError(err?.message || 'Đăng nhập thất bại');
     } finally {
       setLoading(false);
     }
   };
-
-  // registration removed — only login is supported
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden">
@@ -59,7 +66,10 @@ export default function AuthPage({ onLogin }: AuthPageProps) {
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="relative">
             <Film className="w-12 h-12" style={{ color: '#8B5CF6' }} />
-            <div className="absolute inset-0 blur-xl opacity-50" style={{ backgroundColor: '#8B5CF6' }} />
+            <div
+              className="absolute inset-0 blur-xl opacity-50"
+              style={{ backgroundColor: '#8B5CF6' }}
+            />
           </div>
           <div>
             <h1 className="text-[28px] font-bold" style={{ color: '#FFC107' }}>
@@ -77,76 +87,87 @@ export default function AuthPage({ onLogin }: AuthPageProps) {
             <CardTitle className="text-center" style={{ color: '#E5E7EB' }}>
               Chào mừng trở lại
             </CardTitle>
-            <CardDescription className="text-center" style={{ color: '#9CA3AF' }}>
+            <CardDescription
+              className="text-center"
+              style={{ color: '#9CA3AF' }}
+            >
               Đăng nhập hoặc tạo tài khoản mới
             </CardDescription>
           </CardHeader>
           <CardContent>
-              {/* Login Form */}
-              <div className="w-full">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Tên đăng nhập</Label>
+            {/* Login Form */}
+            <div className="w-full">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">Tên đăng nhập</Label>
+                  <Input
+                    id="login-email"
+                    type="text"
+                    placeholder="Nhập Email hoặc SĐT"
+                    required
+                    value={loginIdentifier}
+                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                    className="bg-[#1C253A] border-[#8B5CF6]/30 focus:border-[#FFC107] transition-colors"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Mật khẩu</Label>
+                  <div className="relative">
                     <Input
-                      id="login-email"
-                      type="text"
-                      placeholder=""
+                      id="login-password"
+                      type={showLoginPassword ? 'text' : 'password'}
+                      placeholder="Nhập mật khẩu của bạn"
                       required
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      className="bg-[#1C253A] border-[#8B5CF6]/30 focus:border-[#FFC107] transition-colors"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="bg-[#1C253A] border-[#8B5CF6]/30 focus:border-[#FFC107] transition-colors pr-10"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Mật khẩu</Label>
-                    <div className="relative">
-                      <Input
-                        id="login-password"
-                        type={showLoginPassword ? "text" : "password"}
-                        placeholder=""
-                        required
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        className="bg-[#1C253A] border-[#8B5CF6]/30 focus:border-[#FFC107] transition-colors pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowLoginPassword(!showLoginPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#FFC107] transition-colors"
-                      >
-                        {showLoginPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: '#9CA3AF' }}>
-                      <input type="checkbox" className="rounded border-[#8B5CF6]/30" />
-                      Ghi nhớ đăng nhập
-                    </label>
                     <button
                       type="button"
-                      className="text-sm hover:underline transition-colors"
-                      style={{ color: '#8B5CF6' }}
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#FFC107] transition-colors"
                     >
-                      Quên mật khẩu?
+                      {showLoginPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
-                  <Button
-                    type="submit"
-                    className="w-full bg-[#FFC107] hover:bg-[#FFC107]/90 text-[#0F1629] shadow-lg shadow-[#FFC107]/20"
-                    disabled={loading}
+                </div>
+                <div className="flex items-center justify-between">
+                  <label
+                    className="flex items-center gap-2 text-sm cursor-pointer"
+                    style={{ color: '#9CA3AF' }}
                   >
-                    {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
-                  </Button>
-                  {error && (
-                    <p className="text-sm mt-2" style={{ color: '#F87171' }}>{error}</p>
-                  )}
-                </form>
-              </div>
+                    <input
+                      type="checkbox"
+                      className="rounded border-[#8B5CF6]/30"
+                    />
+                    Ghi nhớ đăng nhập
+                  </label>
+                  <button
+                    type="button"
+                    className="text-sm hover:underline transition-colors"
+                    style={{ color: '#8B5CF6' }}
+                  >
+                    Quên mật khẩu?
+                  </button>
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-[#FFC107] hover:bg-[#FFC107]/90 text-[#0F1629] shadow-lg shadow-[#FFC107]/20"
+                  disabled={loading}
+                >
+                  {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
+                </Button>
+                {error && (
+                  <p className="text-sm mt-2" style={{ color: '#F87171' }}>
+                    {error}
+                  </p>
+                )}
+              </form>
+            </div>
           </CardContent>
         </Card>
 
