@@ -6,6 +6,8 @@ import VouchersPage from './feature/VouchersPage';
 import ShowtimesPage from './feature/ShowtimesPage';
 import UsersPage from './feature/UsersPage';
 import MoviesList from './feature/MovieList';
+import ProductsPage from './feature/ProductsPage';
+import InvoicesPage from './feature/InvoicesPage'
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -31,27 +33,9 @@ export default function App() {
       case 'movies':
         return <MoviesList />;
       case 'products':
-        return (
-          <div className="p-6">
-            <h1 className="text-3xl mb-2" style={{ color: '#E5E7EB' }}>
-              Sản phẩm
-            </h1>
-            <p style={{ color: '#9CA3AF' }}>
-              Trang quản lí sản phẩm đang được phát triển...
-            </p>
-          </div>
-        );
+        return <ProductsPage />;
       case 'invoices':
-        return (
-          <div className="p-6">
-            <h1 className="text-3xl mb-2" style={{ color: '#E5E7EB' }}>
-              Hóa đơn
-            </h1>
-            <p style={{ color: '#9CA3AF' }}>
-              Trang quản lí hóa đơn đang được phát triển...
-            </p>
-          </div>
-        );
+        return <InvoicesPage />;
       case 'showtimes':
         return <ShowtimesPage />;
       case 'vouchers':
