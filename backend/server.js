@@ -12,8 +12,13 @@ const isLogin = require('./middle_wares/isLogin');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
-app.use(bodyParser.json());
+app.use(cors({
+  origin: 'http://localhost:3000', // Khuyến nghị chỉ định rõ nguồn gốc
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+// app.use(bodyParser.json());
+app.use(express.json());
 
 app.use('/auth', authRouter);
 

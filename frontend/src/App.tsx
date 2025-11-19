@@ -19,6 +19,9 @@ export default function App() {
   //Thêm state loading để tránh "nháy" màn hình login khi F5
   const [isLoading, setIsLoading] = useState(true);
 
+  // HÊM STATE ĐỂ QUẢN LÝ VIỆC CHUYỂN ĐỔI GIỮA LOGIN VÀ REGISTER
+  const [isRegistering, setIsRegistering] = useState(false);
+
   //Chạy 1 lần khi App tải
   useEffect(() => {
     // Lấy user từ localStorage
@@ -37,6 +40,7 @@ export default function App() {
     if (user) {
       setCurrentUser(user);
     }
+    setIsRegistering(false);
   };
 
   // Hàm này được MainLayout gọi
@@ -44,17 +48,27 @@ export default function App() {
     logout(); // Xóa token/user khỏi localStorage
     setCurrentUser(null); // Set state về chưa đăng nhập
     setCurrentPage('dashboard');
+    setIsRegistering(false);
   };
 
   // Nếu đang kiểm tra token, chưa hiển thị gì cả
   if (isLoading) {
     return <div>Đang tải ứng dụng...</div>; // (Hoặc spinner)
   }
-
   // Kiểm tra state mới
   if (!currentUser) {
-    return <AuthPage onLogin={handleLogin} />;
-  }
+    return (
+        <AuthPage 
+            onLogin={handleLogin} 
+            // ⭐ TRUYỀN PROPS ĐIỀU KHIỂN XUỐNG AUTH PAGE
+            isRegistering={isRegistering}
+            onToggleRegister={() => {
+                // Đảo ngược trạng thái khi người dùng nhấn nút chuyển đổi
+                setIsRegistering(prev => !prev);
+            }}
+        />
+    );
+}
 
   // là Manager
   if (currentUser.vaiTro === 'QuanLy') {

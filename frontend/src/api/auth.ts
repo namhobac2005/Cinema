@@ -19,6 +19,18 @@ interface LoginCredentials {
   matKhau: string;
 }
 
+export interface RegisterCredentials {
+  // Thay thế 'name' cũ bằng các trường chi tiết:
+  hoTenDem: string;
+  ten: string;
+  ngaySinh: string; // Dùng string, format YYYY-MM-DD
+  soDienThoai: string;
+  
+  // Tên đăng nhập và mật khẩu
+  tenDangNhap: string; 
+  matKhau: string;
+}
+
 const API_URL = 'http://localhost:5000/auth';
 
 export const login = async (
@@ -51,6 +63,28 @@ export const login = async (
   }
 
   return authData;
+};
+
+export const register = async (
+  credentials: RegisterCredentials
+): Promise<{ message: string }> => {
+  const response = await fetch(`${API_URL}/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(credentials),
+  });
+
+  // Backend cho đăng ký thường trả về message và không token/user
+  const data: { message: string } = await response.json();
+
+  if (!response.ok) {
+    // Xử lý các lỗi 400, 409 (Email đã tồn tại), 500 từ backend
+    throw new Error(data.message || 'Đăng ký thất bại');
+  }
+
+  return data;
 };
 
 export const logout = (): void => {

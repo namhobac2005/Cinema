@@ -1,8 +1,52 @@
 const express = require('express');
-const { getPool } = require('./db');
+const { getPool, registerUser } = require('./db');
 const jwt = require('jsonwebtoken');
 const sql = require('mssql');
 const router = express.Router();
+
+/**
+ * API ĐĂNG KÝ
+ * URL: POST /auth/register
+ */
+router.post('/register', async (req, res) => {
+  // ⭐ Nhận các trường dữ liệu cần thiết cho đăng ký
+  const { 
+    hoTenDem, // ⭐ MỚI
+    ten,      // ⭐ MỚI
+    ngaySinh, // ⭐ MỚI
+    soDienThoai, // ⭐ MỚI
+    tenDangNhap, 
+    matKhau 
+  } = req.body; 
+
+  // Validation phải được cập nhật tương ứng
+  if (!hoTenDem || !ten || !ngaySinh || !soDienThoai || !tenDangNhap || !matKhau) {
+      return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin.' });
+  }
+
+  try {
+      // ⭐ CẬP NHẬT LỆNH GỌI HÀM SERVICE
+      // Hàm registerUser phải được gọi với 6 tham số mới
+      const result = await registerUser(hoTenDem, ten, ngaySinh, soDienThoai, tenDangNhap, matKhau);
+
+      // Trả về thông báo thành công
+      res.status(201).json({
+          message: 'Đăng ký thành công. Vui lòng đăng nhập.',
+          userId: result.userId,
+      });
+
+  } catch (err) {
+      console.error('Lỗi đăng ký:', err);
+      
+      // Xử lý lỗi cụ thể (ví dụ: email đã tồn tại)
+      if (err.message.includes('unique constraint')) { 
+           return res.status(409).json({ message: 'Tên đăng nhập (email) này đã được sử dụng.' });
+      }
+      
+      // Lỗi chung của server
+      res.status(500).json({ message: 'Có lỗi xảy ra trong quá trình đăng ký, vui lòng thử lại.' });
+  }
+});
 
 /**
  * API ĐĂNG NHẬP
