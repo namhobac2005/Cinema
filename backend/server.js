@@ -7,6 +7,8 @@ const authRouter = require('./service/auth');
 const movieRouter = require('./service/movie');
 const userRouter = require('./service/users');
 const showtimeRouter = require('./service/showtime');
+const voucherRouter = require('./service/voucher');
+const reportsRouter = require('./service/reports');
 const isLogin = require('./middle_wares/isLogin');
 
 const app = express();
@@ -22,6 +24,8 @@ app.use('/auth', authRouter);
 app.use('/phim', movieRouter);
 app.use('/users', userRouter);
 app.use('/suatchieu', showtimeRouter);
+app.use('/voucher', voucherRouter);
+app.use('/reports', reportsRouter);
 
 app.get('/', (req, res) => {
   res.send('Server đang chạy!');
