@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, Plus, Edit, Trash2, ShoppingBag, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -10,10 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
 
+import { getProducts, addProduct, updateProduct, deleteProduct } from "../api/products";
+
 type ProductCategory = "Thức Ăn" | "Nước uống" | "Combo";
 
 interface BaseProduct {
-  id: string;
+  id: number;
   name: string;
   price: number;
   stock: number;
@@ -23,13 +25,13 @@ interface BaseProduct {
 
 interface FoodProduct extends BaseProduct {
   category: "Thức Ăn";
-  weight: number; // gram
+  weight: number; 
   flavor: string;
 }
 
 interface DrinkProduct extends BaseProduct {
   category: "Nước uống";
-  volume: number; // ml
+  volume: number; 
   hasGas: boolean;
 }
 
@@ -46,166 +48,40 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [filterCategory, setFilterCategory] = useState<ProductCategory | "all">("all");
 
-  // Form states
+  // Form state
   const [formData, setFormData] = useState({
     name: "",
     price: "",
     stock: "",
     supplier: "",
     category: "Thức Ăn" as ProductCategory,
-    // Food specific
     weight: "",
     flavor: "",
-    // Drink specific
     volume: "",
     hasGas: false,
-    // Combo specific
     description: "",
   });
 
-  // TODO: Replace with actual database query
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: "SP001",
-      name: "Bắp rang bơ",
-      price: 45000,
-      stock: 150,
-      supplier: "Sunshine Foods",
-      category: "Thức Ăn",
-      weight: 120,
-      flavor: "Bơ",
-    },
-    {
-      id: "SP002",
-      name: "Bắp rang caramel",
-      price: 50000,
-      stock: 120,
-      supplier: "Sunshine Foods",
-      category: "Thức Ăn",
-      weight: 120,
-      flavor: "Caramel",
-    },
-    {
-      id: "SP003",
-      name: "Nachos phô mai",
-      price: 65000,
-      stock: 80,
-      supplier: "Snack Master",
-      category: "Thức Ăn",
-      weight: 150,
-      flavor: "Phô mai",
-    },
-    {
-      id: "SP004",
-      name: "Coca Cola",
-      price: 25000,
-      stock: 200,
-      supplier: "Coca Cola Vietnam",
-      category: "Nước uống",
-      volume: 500,
-      hasGas: true,
-    },
-    {
-      id: "SP005",
-      name: "Pepsi",
-      price: 25000,
-      stock: 180,
-      supplier: "PepsiCo Vietnam",
-      category: "Nước uống",
-      volume: 500,
-      hasGas: true,
-    },
-    {
-      id: "SP006",
-      name: "Nước suối Aquafina",
-      price: 15000,
-      stock: 250,
-      supplier: "PepsiCo Vietnam",
-      category: "Nước uống",
-      volume: 500,
-      hasGas: false,
-    },
-    {
-      id: "SP007",
-      name: "Trà xanh C2",
-      price: 12000,
-      stock: 160,
-      supplier: "URC Vietnam",
-      category: "Nước uống",
-      volume: 330,
-      hasGas: false,
-    },
-    {
-      id: "SP008",
-      name: "Combo Solo",
-      price: 85000,
-      stock: 50,
-      supplier: "CinemaHub",
-      category: "Combo",
-      description: "1 Bắp rang bơ + 1 Nước ngọt",
-    },
-    {
-      id: "SP009",
-      name: "Combo Couple",
-      price: 150000,
-      stock: 45,
-      supplier: "CinemaHub",
-      category: "Combo",
-      description: "2 Bắp rang caramel + 2 Nước ngọt",
-    },
-    {
-      id: "SP010",
-      name: "Combo Family",
-      price: 280000,
-      stock: 30,
-      supplier: "CinemaHub",
-      category: "Combo",
-      description: "3 Bắp rang + 4 Nước ngọt + 1 Nachos",
-    },
-  ]);
+  // Load từ DB
+  const [products, setProducts] = useState<Product[]>([]);
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === "all" || product.category === filterCategory;
-    return matchesSearch && matchesCategory;
-  });
+  useEffect(() => {
+    getProducts().then(setProducts);
+  }, []);
 
+  // UI Badge
   const getCategoryBadge = (category: ProductCategory) => {
     switch (category) {
       case "Thức Ăn":
-        return (
-          <Badge className="bg-[#FFC107]/20 text-[#FFC107] border-[#FFC107]/30">
-            🍿 Thức Ăn
-          </Badge>
-        );
+        return <Badge className="bg-[#FFC107]/20 text-[#FFC107] border-[#FFC107]/30">🍿 Thức Ăn</Badge>;
       case "Nước uống":
-        return (
-          <Badge className="bg-[#3B82F6]/20 text-[#3B82F6] border-[#3B82F6]/30">
-            🥤 Nước uống
-          </Badge>
-        );
+        return <Badge className="bg-[#3B82F6]/20 text-[#3B82F6] border-[#3B82F6]/30">🥤 Nước uống</Badge>;
       case "Combo":
-        return (
-          <Badge className="bg-[#8B5CF6]/20 text-[#8B5CF6] border-[#8B5CF6]/30">
-            🎁 Combo
-          </Badge>
-        );
+        return <Badge className="bg-[#8B5CF6]/20 text-[#8B5CF6] border-[#8B5CF6]/30">🎁 Combo</Badge>;
     }
   };
 
-  const stats = {
-    total: products.length,
-    totalValue: products.reduce((sum, p) => sum + p.price * p.stock, 0),
-    lowStock: products.filter((p) => p.stock < 50).length,
-    categories: {
-      food: products.filter((p) => p.category === "Thức Ăn").length,
-      drink: products.filter((p) => p.category === "Nước uống").length,
-      combo: products.filter((p) => p.category === "Combo").length,
-    },
-  };
-
+  // Xử lý mở dialog
   const handleOpenDialog = (product?: Product) => {
     if (product) {
       setEditingProduct(product);
@@ -215,9 +91,9 @@ export default function ProductsPage() {
         stock: product.stock.toString(),
         supplier: product.supplier,
         category: product.category,
-        weight: product.category === "Thức Ăn" ? product.weight.toString() : "",
+        weight: product.category === "Thức Ăn" ? String(product.weight) : "",
         flavor: product.category === "Thức Ăn" ? product.flavor : "",
-        volume: product.category === "Nước uống" ? product.volume.toString() : "",
+        volume: product.category === "Nước uống" ? String(product.volume) : "",
         hasGas: product.category === "Nước uống" ? product.hasGas : false,
         description: product.category === "Combo" ? product.description : "",
       });
@@ -244,10 +120,9 @@ export default function ProductsPage() {
     setEditingProduct(null);
   };
 
+  // Lưu DB (POST/PUT)
   const handleSaveProduct = () => {
-    // TODO: Save to database
-    const baseData = {
-      id: editingProduct?.id || `SP${String(products.length + 1).padStart(3, "0")}`,
+    const dataToSend: any = {
       name: formData.name,
       price: parseFloat(formData.price),
       stock: parseInt(formData.stock),
@@ -255,52 +130,63 @@ export default function ProductsPage() {
       category: formData.category,
     };
 
-    let newProduct: Product;
-
     if (formData.category === "Thức Ăn") {
-      newProduct = {
-        ...baseData,
-        category: "Thức Ăn",
-        weight: parseFloat(formData.weight),
-        flavor: formData.flavor,
-      } as FoodProduct;
+      dataToSend.weight = parseFloat(formData.weight);
+      dataToSend.flavor = formData.flavor;
     } else if (formData.category === "Nước uống") {
-      newProduct = {
-        ...baseData,
-        category: "Nước uống",
-        volume: parseFloat(formData.volume),
-        hasGas: formData.hasGas,
-      } as DrinkProduct;
+      dataToSend.volume = parseFloat(formData.volume);
+      dataToSend.hasGas = formData.hasGas;
     } else {
-      newProduct = {
-        ...baseData,
-        category: "Combo",
-        description: formData.description,
-      } as ComboProduct;
+      dataToSend.description = formData.description;
     }
 
     if (editingProduct) {
-      setProducts(products.map((p) => (p.id === editingProduct.id ? newProduct : p)));
+      updateProduct(editingProduct.id, dataToSend)
+        .then(() => getProducts().then(setProducts));
     } else {
-      setProducts([...products, newProduct]);
+      addProduct(dataToSend)
+        .then(() => getProducts().then(setProducts));
     }
 
     handleCloseDialog();
   };
 
-  const handleDeleteProduct = (id: string) => {
-    // TODO: Delete from database
+  // Xóa DB
+  const handleDeleteProduct = (id: number) => {
     if (confirm("Bạn có chắc muốn xóa sản phẩm này?")) {
-      setProducts(products.filter((p) => p.id !== id));
+      deleteProduct(id)
+        .then(() => getProducts().then(setProducts));
     }
   };
+
+  // Filter
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch =
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(product.id).toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = filterCategory === "all" || product.category === filterCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+    const stats = {
+    total: products.length,
+    totalValue: products.reduce((sum, p) => sum + p.price * p.stock, 0),
+    lowStock: products.filter((p) => p.stock < 50).length,
+    categories: {
+      food: products.filter((p) => p.category === "Thức Ăn").length,
+      drink: products.filter((p) => p.category === "Nước uống").length,
+      combo: products.filter((p) => p.category === "Combo").length,
+    },
+  };
+
+
 
   const renderCategorySpecificInfo = (product: Product) => {
     if (product.category === "Thức Ăn") {
       return (
         <div className="text-sm space-y-1">
           <div style={{ color: "#9CA3AF" }}>
-            Trọng lượng: <span style={{ color: "#E5E7EB" }}>{product.weight}g</span>
+            Trọng lượng: <span style={{ color: "#E5E7EB" }}>{product.weight}</span>
           </div>
           <div style={{ color: "#9CA3AF" }}>
             Hương vị: <span style={{ color: "#E5E7EB" }}>{product.flavor}</span>
@@ -311,7 +197,7 @@ export default function ProductsPage() {
       return (
         <div className="text-sm space-y-1">
           <div style={{ color: "#9CA3AF" }}>
-            Thể tích: <span style={{ color: "#E5E7EB" }}>{product.volume}ml</span>
+            Thể tích: <span style={{ color: "#E5E7EB" }}>{product.volume}</span>
           </div>
           <div style={{ color: "#9CA3AF" }}>
             Có gas: <span style={{ color: product.hasGas ? "#10B981" : "#EF4444" }}>
@@ -343,10 +229,10 @@ export default function ProductsPage() {
         </div>
         <Button
           onClick={() => handleOpenDialog()}
-          className="bg-[#8B5CF6] hover:bg-[#7C3AED]"
+          className="bg-[#FFC107] hover:bg-[#FFC107]/90 text-[#0F1629] shadow-lg"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Thêm sản phẩm
+          Thêm sản phẩm mới
         </Button>
       </div>
 
@@ -743,10 +629,11 @@ export default function ProductsPage() {
             </Button>
             <Button
               onClick={handleSaveProduct}
-              className="bg-[#8B5CF6] hover:bg-[#7C3AED]"
+              className="bg-[#FFC107] hover:bg-[#FFC107]/90 text-[#0F1629] shadow-lg"
             >
               {editingProduct ? "Cập nhật" : "Thêm mới"}
             </Button>
+
           </DialogFooter>
         </DialogContent>
       </Dialog>

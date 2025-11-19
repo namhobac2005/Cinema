@@ -10,6 +10,9 @@ const showtimeRouter = require('./service/showtime');
 const voucherRouter = require('./service/voucher');
 const reportsRouter = require('./service/reports');
 const isLogin = require('./middle_wares/isLogin');
+const productRouter = require('./service/product');
+const invoiceRouter = require('./service/invoice');
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -31,6 +34,8 @@ app.use('/users', userRouter);
 app.use('/suatchieu', showtimeRouter);
 app.use('/voucher', voucherRouter);
 app.use('/reports', reportsRouter);
+app.use('/products', productRouter); 
+app.use('/invoice', invoiceRouter);
 
 app.get('/', (req, res) => {
   res.send('Server đang chạy!');

@@ -142,4 +142,4 @@ const getPool = () => {
 };
 
 // ⭐ EXPORT HÀM ĐÃ SỬA VỚI CÁC THAM SỐ MỚI
-module.exports = { connectDB, getPool, registerUser };
+module.exports = { connectDB, getPool, registerUser, sql };
