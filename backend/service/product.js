@@ -1,205 +1,134 @@
 const express = require("express");
-const sql = require("mssql");
-const { getPool } = require("./db");
-
 const router = express.Router();
+const { sql, getPool } = require("./db");
 
-// Convert category FE <-> DB
-const mapCategory = {
+// Mapping UI ↔ DB
+const UI_TO_DB = {
   "Thức Ăn": "ThucAn",
   "Nước uống": "NuocUong",
-  Combo: "Combo"
+  "Combo": "Combo"
 };
 
-const reverseCategory = {
+const DB_TO_UI = {
   ThucAn: "Thức Ăn",
   NuocUong: "Nước uống",
   Combo: "Combo"
 };
 
-/** GET ALL PRODUCTS */
+/** ==================== 📌 GET ALL PRODUCTS ==================== */
 router.get("/", async (req, res) => {
   try {
-    const type = req.query.type ? mapCategory[req.query.type] : null;
     const pool = await getPool();
-
     const result = await pool.request().query(`
-      SELECT * FROM SanPham ${type ? `WHERE PhanLoai='${type}'` : ""}
+      SELECT SP.*, TA.TrongLuong, TA.Vi,
+             NU.TheTich, NU.CoGas,
+             CB.MoTa
+      FROM SanPham SP
+      LEFT JOIN ThucAn TA ON SP.ID = TA.SanPham_ID
+      LEFT JOIN NuocUong NU ON SP.ID = NU.SanPham_ID
+      LEFT JOIN Combo CB ON SP.ID = CB.SanPham_ID
+      ORDER BY SP.ID DESC;
     `);
 
-    const products = [];
+    const data = result.recordset.map((p) => ({
+      id: p.ID,
+      name: p.TenSP,
+      price: Number(p.DonGia),
+      stock: Number(p.TonKho),
+      supplier: p.NhaPhanPhoi,
+      category: DB_TO_UI[p.PhanLoai],
+      weight: p.TrongLuong,
+      flavor: p.Vi,
+      volume: p.TheTich,
+      hasGas: p.CoGas,
+      description: p.MoTa,
+    }));
 
-    for (const sp of result.recordset) {
-      const category = reverseCategory[sp.PhanLoai];
-
-      let detail = null;
-      if (sp.PhanLoai === "ThucAn") {
-        detail = (
-          await pool.request().query(`SELECT * FROM ThucAn WHERE SanPham_ID=${sp.ID}`)
-        ).recordset[0] || null;
-      } else if (sp.PhanLoai === "NuocUong") {
-        detail = (
-          await pool.request().query(`SELECT * FROM NuocUong WHERE SanPham_ID=${sp.ID}`)
-        ).recordset[0] || null;
-      } else {
-        detail = (
-          await pool.request().query(`SELECT * FROM Combo WHERE SanPham_ID=${sp.ID}`)
-        ).recordset[0] || null;
-      }
-
-      products.push({
-        id: sp.ID,
-        name: sp.TenSP,
-        price: Number(sp.DonGia),
-        stock: sp.TonKho,
-        supplier: sp.NhaPhanPhoi,
-        category,
-        ...(category === "Thức Ăn"
-          ? {
-              weight: detail?.TrongLuong ? Number(detail.TrongLuong) : null,
-              flavor: detail?.Vi || null
-            }
-          : category === "Nước uống"
-          ? {
-              volume: detail?.TheTich ? Number(detail.TheTich) : null,
-              hasGas: Boolean(detail?.CoGas)
-            }
-          : {
-              description: detail?.MoTa || null
-            })
-      });
-    }
-
-    res.json(products);
-  } catch (e) {
-    console.log(e);
-    res.status(500).json({ message: "Lỗi server khi lấy sản phẩm" });
+    res.json(data);
+  } catch (err) {
+    console.error("GET Error:", err);
+    res.status(500).json({ message: "Lỗi khi lấy danh sách sản phẩm" });
   }
 });
 
-/** CREATE PRODUCT */
+/** ==================== 📌 ADD PRODUCT ==================== */
 router.post("/", async (req, res) => {
+  const pool = await getPool();
+  const transaction = new sql.Transaction(pool);
+
   try {
     const data = req.body;
-    const dbType = mapCategory[data.category];
-    const pool = await getPool();
+    let type = UI_TO_DB[data.category];
 
-    // INSERT SANPHAM
-    const result = await pool.request()
+    if (!type) return res.status(400).json({ message: "Loại sản phẩm không hợp lệ" });
+
+    await transaction.begin();
+    const reqSP = new sql.Request(transaction);
+
+    // Insert SanPham
+    const insertSP = await reqSP
       .input("TenSP", sql.NVarChar, data.name)
-      .input("DonGia", sql.Decimal(10, 2), data.price)
+      .input("DonGia", sql.Decimal(18, 0), data.price)
       .input("TonKho", sql.Int, data.stock)
-      .input("PhanLoai", sql.VarChar, dbType)
-      .input("NhaPhanPhoi", sql.NVarChar, data.supplier)
+      .input("NPP", sql.NVarChar, data.supplier)
+      .input("Loai", sql.VarChar, type)
       .query(`
-        INSERT INTO SanPham (TenSP, DonGia, TonKho, PhanLoai, NhaPhanPhoi)
-        VALUES (@TenSP, @DonGia, @TonKho, @PhanLoai, @NhaPhanPhoi);
-        SELECT SCOPE_IDENTITY() AS ID;
+        INSERT INTO SanPham (TenSP, DonGia, TonKho, NhaPhanPhoi, PhanLoai)
+        OUTPUT INSERTED.ID
+        VALUES (@TenSP, @DonGia, @TonKho, @NPP, @Loai)
       `);
 
-    const newId = result.recordset[0].ID;
+    const newID = insertSP.recordset[0].ID;
+    const reqDetail = new sql.Request(transaction);
 
-    // Insert detail based on category
-    if (dbType === "ThucAn") {
-      await pool.request()
-        .input("ID", newId)
-        .input("TrongLuong", sql.Float, data.weight ? data.weight : null)
-        .input("Vi", sql.NVarChar, data.flavor || null)
-        .query(`INSERT INTO ThucAn VALUES (@ID, @TrongLuong, @Vi)`);
-    } else if (dbType === "NuocUong") {
-      await pool.request()
-        .input("ID", newId)
-        .input("TheTich", sql.Float, data.volume ? data.volume : null)
-        .input("CoGas", sql.Bit, data.hasGas ? 1 : 0)
-        .query(`INSERT INTO NuocUong VALUES (@ID, @TheTich, @CoGas)`);
-    } else {
-      await pool.request()
-        .input("ID", newId)
-        .input("MoTa", sql.NVarChar, data.description || null)
-        .query(`INSERT INTO Combo VALUES (@ID, @MoTa)`);
-    }
-
-    res.status(201).json({ message: "Thêm sản phẩm thành công" });
-  } catch (e) {
-    console.log(e);
-    res.status(500).json({ message: "Không thể thêm sản phẩm" });
-  }
-});
-
-/** UPDATE PRODUCT */
-router.put("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const data = req.body;
-    const dbType = mapCategory[data.category];
-
-    const pool = await getPool();
-
-    // 1. UPDATE bảng SanPham
-    await pool.request()
-      .input("ID", sql.Int, id)
-      .input("TenSP", sql.NVarChar, data.name)
-      .input("DonGia", sql.Decimal(10,2), data.price)
-      .input("TonKho", sql.Int, data.stock)
-      .input("PhanLoai", sql.VarChar, dbType)
-      .input("NhaPhanPhoi", sql.NVarChar, data.supplier)
-      .query(`
-        UPDATE SanPham 
-        SET TenSP=@TenSP, DonGia=@DonGia, TonKho=@TonKho, PhanLoai=@PhanLoai, NhaPhanPhoi=@NhaPhanPhoi
-        WHERE ID=@ID;
-      `);
-
-    // 2. Cập nhật bảng chi tiết theo loại
-    if (dbType === "ThucAn") {
-      await pool.request()
-        .input("ID", sql.Int, id)
-        .input("TrongLuong", sql.VarChar, data.weight)
+    // Insert type detail
+    if (type === "ThucAn") {
+      await reqDetail
+        .input("ID", sql.Int, newID)
+        .input("TL", sql.NVarChar, data.weight)
         .input("Vi", sql.NVarChar, data.flavor)
-        .query(`
-          UPDATE ThucAn 
-          SET TrongLuong=@TrongLuong, Vi=@Vi 
-          WHERE SanPham_ID=@ID;
-        `);
-
-    } else if (dbType === "NuocUong") {
-      await pool.request()
-        .input("ID", sql.Int, id)
-        .input("TheTich", sql.VarChar, data.volume)
-        .input("CoGas", sql.Bit, data.hasGas ? 1 : 0)
-        .query(`
-          UPDATE NuocUong 
-          SET TheTich=@TheTich, CoGas=@CoGas 
-          WHERE SanPham_ID=@ID;
-        `);
-
+        .query(`INSERT INTO ThucAn VALUES (@ID, @TL, @Vi)`);
+    } else if (type === "NuocUong") {
+      await reqDetail
+        .input("ID", sql.Int, newID)
+        .input("TT", sql.NVarChar, data.volume)
+        .input("Gas", sql.Bit, data.hasGas ? 1 : 0)
+        .query(`INSERT INTO NuocUong VALUES (@ID, @TT, @Gas)`);
     } else {
-      await pool.request()
-        .input("ID", sql.Int, id)
-        .input("MoTa", sql.NVarChar, data.description)
-        .query(`
-          UPDATE Combo 
-          SET MoTa=@MoTa 
-          WHERE SanPham_ID=@ID;
-        `);
+      await reqDetail
+        .input("ID", sql.Int, newID)
+        .input("MT", sql.NVarChar, data.description)
+        .query(`INSERT INTO Combo VALUES (@ID, @MT)`);
     }
 
-    res.json({ message: "Cập nhật sản phẩm thành công" });
+    await transaction.commit();
+    res.json({ message: "Thêm sản phẩm thành công", id: newID });
 
-  } catch (e) {
-    console.log(e);
-    res.status(500).json({ message: "Không thể cập nhật sản phẩm" });
+  } catch (err) {
+    await transaction.rollback();
+    res.status(500).json({ message: "Lỗi khi thêm sản phẩm" });
   }
 });
 
+/** ==================== 📌 UPDATE PRODUCT (Bạn gửi) ==================== */
+// 👉 Giữ nguyên code UPDATE bạn đã gửi bên trên
+// (Không cần sửa)
 
-/** DELETE PRODUCT */
+/** ==================== 📌 DELETE PRODUCT ==================== */
 router.delete("/:id", async (req, res) => {
   try {
     const pool = await getPool();
-    await pool.request().query(`DELETE FROM SanPham WHERE ID=${req.params.id}`);
+    const id = req.params.id;
+
+    const result = await pool.request().input("ID", sql.Int, id)
+      .query("DELETE FROM SanPham WHERE ID=@ID");
+
+    if (result.rowsAffected[0] === 0) return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
+
     res.json({ message: "Xóa thành công" });
-  } catch (e) {
-    res.status(500).json({ message: "Không thể xóa" });
+
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi khi xóa sản phẩm" });
   }
 });
 
