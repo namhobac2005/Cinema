@@ -5,6 +5,9 @@ export interface CustomerResponse {
   name: string;
   membershipTier: string;
   points: number;
+  email?: string;
+  phone?: string;
+  dateOfBirth?: string;
 }
 
 export interface EmployeeResponse {
@@ -13,6 +16,16 @@ export interface EmployeeResponse {
   joinDate: string;
   salary: number;
 }
+
+export interface CustomerPayload {
+  name: string;
+  phone: string;
+  email?: string;
+  dateOfBirth?: string;
+  points?: number;
+}
+
+export interface UpdateCustomerPayload extends Partial<CustomerPayload> {}
 
 async function handleResponse<T>(response: Response): Promise<T> {
   let payload: any = null;
@@ -42,4 +55,33 @@ export async function fetchEmployees(): Promise<EmployeeResponse[]> {
   return handleResponse<EmployeeResponse[]>(res);
 }
 
-export default { fetchCustomers, fetchEmployees };
+export async function createCustomer(payload: CustomerPayload): Promise<CustomerResponse> {
+  const url = `${API_BASE.replace(/\/$/, '')}/users/customers`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<CustomerResponse>(res);
+}
+
+export async function updateCustomer(
+  id: string,
+  payload: UpdateCustomerPayload,
+): Promise<CustomerResponse> {
+  const url = `${API_BASE.replace(/\/$/, '')}/users/customers/${id}`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<CustomerResponse>(res);
+}
+
+export async function deleteCustomer(id: string): Promise<void> {
+  const url = `${API_BASE.replace(/\/$/, '')}/users/customers/${id}`;
+  const res = await fetch(url, { method: 'DELETE' });
+  await handleResponse<{ success: boolean }>(res);
+}
+
+export default { fetchCustomers, fetchEmployees, createCustomer, updateCustomer, deleteCustomer };
