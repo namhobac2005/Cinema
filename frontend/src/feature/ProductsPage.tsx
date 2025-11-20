@@ -232,8 +232,9 @@ export default function ProductsPage() {
 
       await fetchProducts();
       handleCloseDialog();
-    } catch (error) {
-      alert("Có lỗi xảy ra khi lưu sản phẩm!");
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || "Có lỗi xảy ra khi lưu sản phẩm!";
+      alert(msg);
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -245,6 +246,7 @@ export default function ProductsPage() {
       try {
         await deleteProduct(id);
         await fetchProducts();
+        alert("Xóa sản phẩm thành công!");
       } catch (error) {
         alert("Không thể xóa sản phẩm!");
       }
