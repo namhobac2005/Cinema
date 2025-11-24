@@ -47,6 +47,49 @@ router.get('/stats/revenue-month', async (req, res) => {
   } catch (err) { console.error(err); res.status(500).send(err.message); }
 });
 
+// API: GET /reports/stats/revenue-day
+router.get('/stats/revenue-day', async (req, res) => {
+  try {
+    const pool = getPool();
+    const query = `
+      DECLARE @Today DATE = CAST(GETDATE() AS DATE);
+      DECLARE @Yesterday DATE = DATEADD(DAY, -1, @Today);
+
+      DECLARE @RevTicketToday DECIMAL(18,2) = dbo.fn_TinhDoanhThuHomNay();
+      
+      DECLARE @RevProductToday DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(s.SoLuong * s.DonGiaLucBan), 0) 
+        FROM HoaDon_SanPham s 
+        JOIN HoaDon h ON s.HoaDon_ID = h.ID 
+        WHERE h.TrangThaiThanhToan = 'DaThanhToan' 
+          AND CAST(h.ThoiGianTao AS DATE) = @Today
+      );
+      
+      DECLARE @RevToday DECIMAL(18,2) = @RevTicketToday + @RevProductToday;
+
+      DECLARE @RevYesterday DECIMAL(18,2) = (
+        SELECT ISNULL(SUM(v.GiaVeBan), 0) 
+        FROM Ve v JOIN HoaDon h ON v.HoaDon_ID = h.ID 
+        WHERE h.TrangThaiThanhToan='DaThanhToan' AND CAST(h.ThoiGianTao AS DATE) = @Yesterday
+      ) + (
+        SELECT ISNULL(SUM(s.SoLuong * s.DonGiaLucBan), 0) 
+        FROM HoaDon_SanPham s JOIN HoaDon h ON s.HoaDon_ID = h.ID 
+        WHERE h.TrangThaiThanhToan='DaThanhToan' AND CAST(h.ThoiGianTao AS DATE) = @Yesterday
+      );
+
+      DECLARE @Change DECIMAL(10, 2) = 0;
+      IF @RevYesterday > 0 
+        SET @Change = ((@RevToday - @RevYesterday) / @RevYesterday) * 100;
+      ELSE IF @RevToday > 0 
+        SET @Change = 100;
+
+      SELECT @RevToday AS value, @Change AS change;
+    `;
+    const result = await pool.request().query(query);
+    res.json(result.recordset[0]);
+  } catch (err) { console.error(err); res.status(500).send(err.message); }
+});
+
 // API: GET /reports/stats/tickets-month
 router.get('/stats/tickets-month', async (req, res) => {
   try {
@@ -70,6 +113,39 @@ router.get('/stats/tickets-month', async (req, res) => {
       ELSE IF @TicketThisMonth > 0 SET @Change = 100;
 
       SELECT @TicketThisMonth AS value, @Change AS change;
+    `;
+    const result = await pool.request().query(query);
+    res.json(result.recordset[0]);
+  } catch (err) { console.error(err); res.status(500).send(err.message); }
+});
+
+// API: GET /reports/stats/tickets-day
+router.get('/stats/tickets-day', async (req, res) => {
+  try {
+    const pool = getPool();
+    const query = `
+      DECLARE @Today DATE = CAST(GETDATE() AS DATE);
+      DECLARE @Yesterday DATE = DATEADD(DAY, -1, @Today);
+
+      DECLARE @TicketToday INT = (
+        SELECT COUNT(v.ID) FROM Ve v JOIN HoaDon h ON v.HoaDon_ID = h.ID
+        WHERE h.TrangThaiThanhToan = 'DaThanhToan' AND v.TrangThai = 'DaThanhToan' 
+          AND CAST(h.ThoiGianTao AS DATE) = @Today
+      );
+
+      DECLARE @TicketYesterday INT = (
+        SELECT COUNT(v.ID) FROM Ve v JOIN HoaDon h ON v.HoaDon_ID = h.ID
+        WHERE h.TrangThaiThanhToan = 'DaThanhToan' AND v.TrangThai = 'DaThanhToan' 
+          AND CAST(h.ThoiGianTao AS DATE) = @Yesterday
+      );
+
+      DECLARE @Change DECIMAL(10, 2) = 0;
+      IF @TicketYesterday > 0 
+        SET @Change = ((CAST(@TicketToday AS DECIMAL) - @TicketYesterday) / @TicketYesterday) * 100;
+      ELSE IF @TicketToday > 0 
+        SET @Change = 100;
+
+      SELECT @TicketToday AS value, @Change AS change;
     `;
     const result = await pool.request().query(query);
     res.json(result.recordset[0]);
