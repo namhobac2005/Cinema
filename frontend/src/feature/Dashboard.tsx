@@ -82,6 +82,9 @@ const formatDate = (dateString: string) => {
 export default function Dashboard() {
   const [revMonth, setRevMonth] = useState<IStatWithTrend | null>(null);
   const [tickMonth, setTickMonth] = useState<IStatWithTrend | null>(null);
+
+  const [revDay, setRevDay] = useState<IStatWithTrend | null>(null);
+  const [tickDay, setTickDay] = useState<IStatWithTrend | null>(null);
   const [generalStats, setGeneralStats] = useState<IGeneralStats | null>(null);
 
   const [chartData, setChartData] = useState<IChartData[]>([]);
@@ -102,6 +105,8 @@ export default function Dashboard() {
         const results = await Promise.all([
           axios.get(`${baseUrl}/stats/revenue-month`),
           axios.get(`${baseUrl}/stats/tickets-month`),
+          axios.get(`${baseUrl}/stats/revenue-day`),
+          axios.get(`${baseUrl}/stats/tickets-day`),
           axios.get(`${baseUrl}/stats/general`),
           axios.get(`${baseUrl}/charts/6months`),
           axios.get(`${baseUrl}/tables/recent-movies`),
@@ -111,11 +116,13 @@ export default function Dashboard() {
 
         setRevMonth(results[0].data);
         setTickMonth(results[1].data);
-        setGeneralStats(results[2].data);
-        setChartData(results[3].data);
-        setRecentMovies(results[4].data);
-        setRecentInvoices(results[5].data);
-        setTopProducts(results[6].data);
+        setRevDay(results[2].data);
+        setTickDay(results[3].data);
+        setGeneralStats(results[4].data);
+        setChartData(results[5].data);
+        setRecentMovies(results[6].data);
+        setRecentInvoices(results[7].data);
+        setTopProducts(results[8].data);
 
       } catch (error) {
         console.error("Lỗi tải dữ liệu Dashboard:", error);
@@ -162,6 +169,22 @@ export default function Dashboard() {
       showTrend: true,
     },
     {
+      title: "Doanh thu hôm nay",
+      value: revDay ? formatCurrency(revDay.value) : "...",
+      change: revDay?.change,
+      icon: DollarSign,
+      color: "#FFC107",
+      showTrend: true,
+    },
+    {
+      title: "Vé bán hôm nay",
+      value: tickDay ? tickDay.value.toLocaleString() : "...",
+      change: tickDay?.change,
+      icon: Receipt,
+      color: "#10B981",
+      showTrend: true,
+    },
+    {
       title: "Phim đang chiếu",
       value: generalStats ? generalStats.moviesShowing : "...",
       icon: Film,
@@ -203,17 +226,23 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div 
+        className="grid gap-4"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' 
+        }}
+      >
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           const isUp = (stat.change || 0) >= 0;
           
           return (
-            <Card key={index} className="border-[#8B5CF6]/20 hover:border-[#8B5CF6]/40 transition-all">
-              <CardContent className="p-6">
+            <Card key={index} className="border-[#8B5CF6]/20 hover:border-[#8B5CF6]/40 transition-all min-w-0">
+              <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: `${stat.color}20` }}>
-                    <Icon className="w-6 h-6" style={{ color: stat.color }} />
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: `${stat.color}20` }}>
+                    <Icon className="w-5 h-5" style={{ color: stat.color }} />
                   </div>
                   {stat.showTrend && stat.change !== undefined && (
                     <div className={`flex items-center gap-1 text-sm px-2 py-1 rounded-full ${
@@ -231,8 +260,8 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm mb-1" style={{ color: '#9CA3AF' }}>{stat.title}</p>
-                  <p className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</p>
+                  <p className="text-xs mb-1 truncate" style={{ color: '#9CA3AF' }}>{stat.title}</p>
+                  <p className="text-xl font-bold truncate" style={{ color: stat.color }}>{stat.value}</p>
                 </div>
               </CardContent>
             </Card>
