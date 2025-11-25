@@ -17,9 +17,10 @@ interface AuthPageProps {
   onLogin: () => void;
   isRegistering: boolean; // Prop xác định trạng thái đăng ký
   onToggleRegister: () => void; // Prop chuyển đổi trạng thái
+  onGuestContinue?: () => void;
 }
 
-export default function AuthPage({ onLogin, isRegistering, onToggleRegister }: AuthPageProps) {
+export default function AuthPage({ onLogin, isRegistering, onToggleRegister, onGuestContinue }: AuthPageProps) {
   // --- LOGIN STATE ---
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -402,7 +403,20 @@ export default function AuthPage({ onLogin, isRegistering, onToggleRegister }: A
             </div>
           </CardContent>
         </Card>
-
+        
+        {/* Guest Continue Button */}
+        {
+          <div className="mt-4">
+            <Button
+              onClick={() => onGuestContinue && onGuestContinue()}
+              variant="outline"
+              className="w-full border-[#8B5CF6]/30 hover:bg-[#8B5CF6]/20 hover:border-[#8B5CF6]"
+              style={{ color: '#E5E7EB' }}
+            >
+              Tiếp tục mà không đăng nhập
+            </Button>
+          </div>
+        }
         {/* Footer */}
         <p className="text-center mt-6 text-sm" style={{ color: '#9CA3AF' }}>
           © 2025 CinemaHub. Bản quyền thuộc về công ty.
