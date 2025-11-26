@@ -62,19 +62,17 @@
 /* ==================== POSTER IMAGE ==================== */
 .movie-thumb {
   width: 100%;
-  aspect-ratio: 27/40;   /* chuẩn poster 40×27 */
+  position: relative;
   overflow: hidden;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
 }
 
 .movie-thumb-img {
   width: 100%;
-  height: 100%;
-  display: block;
+  aspect-ratio: 2 / 3;   /* poster đứng, cao hơn rộng */
   object-fit: cover;
-  filter: contrast(1.02) brightness(0.98);
+  display: block;
 }
+
 
 /* ==================== SHOWTIME BUTTON ==================== */
 .movie-showtime-btn {
@@ -153,4 +151,37 @@
   background-color: #7C3AED !important;
   color: #ffffff !important;
   box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+}
+/* ========== MOVIE DETAIL (Customer / Guest shared) ========== */
+
+.movie-detail-grid {
+display: grid;
+grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+gap: 1.5rem;
+align-items: stretch;
+}
+
+@media (max-width: 768px) {
+.movie-detail-grid {
+  grid-template-columns: 1fr;
+}
+}
+
+.movie-detail-poster {
+border-radius: 16px;
+overflow: hidden;
+background-color: #020617;
+max-height: 400px;          /* giới hạn chiều cao poster cho đừng quá to */
+}
+
+.movie-detail-poster-img {
+width: 100%;
+height: 100%;
+object-fit: cover;
+}
+
+.movie-detail-content {
+display: flex;
+flex-direction: column;
+justify-content: space-between;
 }
