@@ -8,10 +8,11 @@ import UsersPage from './feature/UsersPage';
 import MoviesList from './feature/MovieList';
 import ProductsPage from './feature/ProductsPage';
 import InvoicesPage from './feature/InvoicesPage';
-import CusDashboard from './feature/Cus-DashBoard';
+import CustomerBooking from './feature/Cus-DashBoard';
 import GuestDashboard from './feature/Guest-Dashboard';
 
 import { getCurrentUser, logout, User } from './api/auth';
+
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -104,7 +105,7 @@ export default function App() {
 
   //📌 Customer & Employee share same page
   if (currentUser.vaiTro === 'KhachHang' || currentUser.vaiTro === 'NhanVien') {
-    return <CusDashboard onLogout={handleLogout} />;
+    return <CustomerBooking onLogout={handleLogout} />;
   }
 
   if (!currentUser && currentPage === 'guestdashboard') {

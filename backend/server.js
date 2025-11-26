@@ -12,6 +12,8 @@ const reportsRouter = require('./service/reports');
 const isLogin = require('./middle_wares/isLogin');
 const productRouter = require('./service/product');
 const invoiceRouter = require('./service/invoice');
+const bookingRouter = require('./service/booking');
+const tmdbRouter = require('./service/tmdb');
 
 
 const app = express();
@@ -36,6 +38,8 @@ app.use('/voucher', voucherRouter);
 app.use('/reports', reportsRouter);
 app.use('/products', productRouter); 
 app.use('/invoice', invoiceRouter);
+app.use('/booking', bookingRouter);
+app.use('/tmdb', tmdbRouter);
 
 app.get('/', (req, res) => {
   res.send('Server đang chạy!');
