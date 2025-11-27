@@ -53,6 +53,8 @@ Phần dưới đây là hướng dẫn chạy Backend.
     DB_PASSWORD = 1234 --tự tạo
     DB_PORT = 1433 --mặc định
 
+    TMDB_API_KEY=your_actual_api_key_here --xem chi tiết trong TMDB_SETUP.md
+
     ```
 
     ```

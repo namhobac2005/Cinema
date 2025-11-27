@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import axios from 'axios';
 import { getCurrentUser } from "../api/auth";
 import {
   Film,
@@ -19,6 +20,7 @@ import {
   Armchair,
   Check,
   LogOut,
+  LogIn,
 } from "lucide-react";
 import { 
   fetchTheaters, 
@@ -129,6 +131,7 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
   const [showQRCode, setShowQRCode] = useState(false);
   const [voucherCode, setVoucherCode] = useState("");
   const [discount, setDiscount] = useState(0);
+  const [pendingHoaDonId, setPendingHoaDonId] = useState<number | null>(null);
   
   // Data từ API
   const [theaters, setTheaters] = useState<Theater[]>([]);
@@ -142,23 +145,15 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
 
-  // User data (from auth). Fallback to sample when no logged-in user found.
-  const [userData, setUserData] = useState<{ name: string; email: string; phone: string }>({
-    name: "Nguyễn Văn A",
-    email: "nguyenvana@example.com",
-    phone: "0912345678",
-  });
+  const currentUser = getCurrentUser();
+  const isGuest = !currentUser; 
 
-  useEffect(() => {
-    const u = getCurrentUser();
-    if (u) {
-      setUserData({
-        name: u.ten || "",
-        email: u.email || "",
-        phone: (u as any).phoneNum || "",
-      });
-    }
-  }, []);
+  // Khởi tạo dữ liệu form
+  const [userData, setUserData] = useState<{ name: string; email: string; phone: string }>({
+    name: currentUser?.ten || "",
+    email: currentUser?.email || "",
+    phone: (currentUser as any)?.phoneNum || "",
+  });
 
   // Fetch theaters khi component mount
   useEffect(() => {
@@ -474,16 +469,31 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
     setCart(cart.filter((item) => item.id !== id));
   };
 
-  const applyVoucher = () => {
-    if (voucherCode.toUpperCase() === "SAVE10") {
-      setDiscount(10);
-      alert("Voucher áp dụng thành công! Giảm 10%");
-    } else if (voucherCode.toUpperCase() === "SAVE50K") {
-      setDiscount(50000);
-      alert("Voucher áp dụng thành công! Giảm 50.000₫");
-    } else {
-      alert("Mã voucher không hợp lệ!");
-      setDiscount(0);
+  const applyVoucher = async () => {
+    if (!voucherCode.trim()) {
+      alert("Vui lòng nhập mã voucher!");
+      return;
+    }
+
+    try {
+      const response = await axios.post('http://localhost:5000/booking/voucher/check', {
+        code: voucherCode
+      });
+
+      const voucher = response.data; // Dữ liệu trả về: { MaGiam, Loai, MucGiam, ... }
+
+      if (voucher.Loai === 'PhanTram') {
+        setDiscount(voucher.MucGiam);
+        alert(`Áp dụng thành công! Giảm ${voucher.MucGiam}%`);
+      } else {
+        setDiscount(voucher.MucGiam);
+        alert(`Áp dụng thành công! Giảm ${voucher.MucGiam.toLocaleString()}đ`);
+      }
+
+    } catch (error: any) {
+      console.error(error);
+      setDiscount(0); 
+      alert(error.response?.data?.message || "Mã voucher không hợp lệ hoặc đã hết lượt!");
     }
   };
 
@@ -499,21 +509,108 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
     setIsCheckoutOpen(true);
   };
 
-  const handleConfirmCheckout = (e: React.FormEvent) => {
+  const handleConfirmCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsCheckoutOpen(false);
-    setIsPaymentOpen(true);
+
+    if (isGuest && (!userData.name || !userData.email || !userData.phone)) {
+      alert("Vui lòng điền đầy đủ Họ tên, Email và SĐT để nhận vé!");
+      return;
+    }
+
+    console.log("--- DEBUG TẠO ĐƠN ---");
+    console.log("Selected Showtime:", selectedShowtime);
+    console.log("Selected Seats (Raw):", selectedSeats);
+
+    const formattedSeats = selectedSeats.map(seatId => {
+      const row = seatId.charAt(0);
+      const col = seatId.substring(1);
+      return { HangGhe: row, SoGhe: col };
+    });
+
+    const formattedProducts = cart
+      .filter(item => item.type === 'product')
+      .map(item => ({ 
+        SanPham_ID: Number(item.id), 
+        SoLuong: item.quantity 
+      }));
+
+    // Lấy ID khách hàng (nếu đã đăng nhập)
+    const user = getCurrentUser();
+    const customerId = user ? (user as any).id : null;
+
+    // --- DEBUG PAYLOAD ---
+    const payload = {
+        KhachHang_ID: customerId,
+        SuatChieu_ID: selectedShowtime?.id,
+        DanhSachGhe: formattedSeats,
+        DanhSachSanPham: formattedProducts
+    };
+    console.log("PAYLOAD GỬI ĐI:", JSON.stringify(payload, null, 2));
+    // -------------------------------------
+
+    try {
+      const response = await axios.post('http://localhost:5000/booking/create', {
+        KhachHang_ID: customerId,
+        SuatChieu_ID: selectedShowtime?.id,
+        DanhSachGhe: formattedSeats,
+        DanhSachSanPham: formattedProducts
+      });
+
+      setPendingHoaDonId(response.data.hoaDonId);
+      setIsCheckoutOpen(false);
+      setIsPaymentOpen(true); 
+
+    } catch (error: any) {
+      console.error("Lỗi đặt vé:", error);
+      alert(error.response?.data?.message || "Có lỗi xảy ra khi tạo đơn hàng.");
+    }
   };
 
-  const handlePayment = () => {
-    setIsPaymentOpen(false);
-    setShowQRCode(true);
+  const handlePayment = async (method: string = "QR_Code") => {
+    console.log("--- BẮT ĐẦU THANH TOÁN ---");
+    console.log("ID Hóa đơn đang chờ:", pendingHoaDonId); 
+
+    try {
+      console.log(`Đang gọi API confirm với ID: ${pendingHoaDonId}, Method: ${method}`);
+      
+      const response = await axios.post('http://localhost:5000/booking/confirm', {
+        hoaDonId: pendingHoaDonId,
+        phuongThuc: method,
+        voucherCode: discount > 0 ? voucherCode : null
+      });
+
+      console.log("Kết quả trả về:", response.data);
+
+      setIsPaymentOpen(false);
+      setShowQRCode(true);
+
+    } catch (error: any) {
+      console.error("Lỗi thanh toán:", error);
+      alert(error.response?.data?.message || "Lỗi xác nhận thanh toán!");
+    }
   };
+
+  const handleCancelPayment = async () => {
+    if (pendingHoaDonId) {
+      try {
+        await axios.post('http://localhost:5000/booking/cancel', { 
+          hoaDonId: pendingHoaDonId 
+        });
+        setPendingHoaDonId(null);
+        console.log("Đã hủy đơn hàng tạm.");
+      } catch (error) {
+        console.error("Lỗi hủy đơn:", error);
+      }
+    }
+    setIsPaymentOpen(false); 
+  };
+  
 
   const handleFinish = () => {
     setCart([]);
     setVoucherCode("");
     setDiscount(0);
+    setPendingHoaDonId(null);
     setShowQRCode(false);
     setViewMode("theaters");
     setSelectedTheater(null);
@@ -582,12 +679,20 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-sm" style={{ color: "#E5E7EB" }}>
-                {userData.name}
-              </p>
-              <p className="text-xs" style={{ color: "#9CA3AF" }}>
-                {userData.email}
-              </p>
+              {isGuest ? (
+                <p className="text-sm italic" style={{ color: "#9CA3AF" }}>
+                  Guest
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm" style={{ color: "#E5E7EB" }}>
+                    {userData.name}
+                  </p>
+                  <p className="text-xs" style={{ color: "#9CA3AF" }}>
+                    {userData.email}
+                  </p>
+                </>
+              )}
             </div>
             {onLogout && (
               <Button
@@ -597,8 +702,17 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
                 className="hover:bg-red-500/20"
                 style={{ color: "#EF4444" }}
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Đăng xuất
+                {isGuest ? (
+                  <>
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Đăng nhập
+                  </>
+                ) : (
+                  <>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Đăng xuất
+                  </>
+                )}
               </Button>
             )}
             <div
@@ -1573,24 +1687,30 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
               <Label style={{ color: "#E5E7EB" }}>Họ và tên</Label>
               <Input
                 value={userData.name}
-                disabled
+                disabled={!isGuest} 
+                onChange={(e) => setUserData({...userData, name: e.target.value})}
                 className="bg-[#0F1629] border-[#8B5CF6]/30 text-[#E5E7EB]"
+                placeholder="Nhập họ tên người nhận vé"
               />
             </div>
             <div>
               <Label style={{ color: "#E5E7EB" }}>Email</Label>
               <Input
                 value={userData.email}
-                disabled
+                disabled={!isGuest}
+                onChange={(e) => setUserData({...userData, email: e.target.value})}
                 className="bg-[#0F1629] border-[#8B5CF6]/30 text-[#E5E7EB]"
+                placeholder="Nhập email để nhận mã vé"
               />
             </div>
             <div>
               <Label style={{ color: "#E5E7EB" }}>Số điện thoại</Label>
               <Input
                 value={userData.phone}
-                disabled
+                disabled={!isGuest}
+                onChange={(e) => setUserData({...userData, phone: e.target.value})}
                 className="bg-[#0F1629] border-[#8B5CF6]/30 text-[#E5E7EB]"
+                placeholder="Nhập số điện thoại liên hệ"
               />
             </div>
 
@@ -1682,7 +1802,7 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
 
             <div className="space-y-3">
               <Button
-                onClick={handlePayment}
+                onClick={() => handlePayment("Credit_Card")}
                 className="w-full justify-start h-auto p-4 bg-[#1C253A] hover:bg-[#8B5CF6]/20 border border-[#8B5CF6]/30"
               >
                 <CreditCard
@@ -1703,7 +1823,7 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
               </Button>
 
               <Button
-                onClick={handlePayment}
+                onClick={() => handlePayment("E-Wallet")}
                 className="w-full justify-start h-auto p-4 bg-[#1C253A] hover:bg-[#8B5CF6]/20 border border-[#8B5CF6]/30"
               >
                 <QrCode
@@ -1722,7 +1842,7 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
               </Button>
 
               <Button
-                onClick={handlePayment}
+                onClick={() =>handlePayment("Bank_Transfer")}
                 className="w-full justify-start h-auto p-4 bg-[#1C253A] hover:bg-[#8B5CF6]/20 border border-[#8B5CF6]/30"
               >
                 <div className="w-5 h-5 mr-3 flex items-center justify-center">
@@ -1764,7 +1884,7 @@ export default function CustomerBooking({ onLogout }: CustomerBookingProps) {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setIsPaymentOpen(false)}
+              onClick={handleCancelPayment}
               className="border-[#8B5CF6]/30 hover:bg-[#8B5CF6]/20"
               style={{ color: "#E5E7EB" }}
             >
