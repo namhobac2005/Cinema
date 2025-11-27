@@ -149,490 +149,223 @@ router.get('/showtimes', async (req, res) => {
   }
 });
 
-// GET /booking/showtimes/:showtimeId/seats - Lấy sơ đồ ghế
+// GET /booking/showtimes/:showtimeId/seats
 router.get('/showtimes/:showtimeId/seats', async (req, res) => {
   try {
-    const pool = getPool();
     const { showtimeId } = req.params;
+    const pool = getPool();
     
-    // Lấy thông tin suất chiếu
-    const showtimeRequest = pool.request();
-    showtimeRequest.input('showtimeId', sql.Int, showtimeId);
+    const scRes = await pool.request().input('id', sql.Int, showtimeId)
+      .query(`
+        SELECT sc.ID, sc.ThoiGianBatDau, pc.LoaiPhong, p.TenPhim
+        FROM SuatChieu sc
+        JOIN PhongChieu pc ON sc.Rap_ID = pc.Rap_ID AND sc.SoPhong = pc.SoPhong
+        JOIN Phim p ON sc.Phim_ID = p.ID
+        WHERE sc.ID = @id
+      `);
     
-    const showtimeQuery = `
-      SELECT 
-        sc.ID as id,
-        sc.Rap_ID as rapId,
-        r.TenRap as rapName,
-        sc.SoPhong as room,
-        sc.ThoiGianBatDau as startTime,
-        pc.LoaiPhong as format,
-        p.LongTieng as longTieng,
-        p.PhuDe as phuDe,
-        p.TenPhim as movieName
-      FROM SuatChieu sc
-      INNER JOIN Rap r ON sc.Rap_ID = r.ID
-      INNER JOIN Phim p ON sc.Phim_ID = p.ID
-      INNER JOIN PhongChieu pc ON sc.Rap_ID = pc.Rap_ID AND sc.SoPhong = pc.SoPhong
-      WHERE sc.ID = @showtimeId
-    `;
+    if (scRes.recordset.length === 0) return res.status(404).json({message: 'Suất chiếu không tồn tại'});
+    const showtime = scRes.recordset[0];
+
+    const result = await pool.request()
+      .input('SuatChieu_ID', sql.Int, showtimeId)
+      .execute('sp_LayTrangThaiGhe');
     
-    const showtimeResult = await showtimeRequest.query(showtimeQuery);
-    
-    if (showtimeResult.recordset.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy suất chiếu.' });
-    }
-    
-    const showtime = showtimeResult.recordset[0];
-    
-    // Lấy danh sách ghế và trạng thái
-    const seatsRequest = pool.request();
-    seatsRequest.input('showtimeId', sql.Int, showtimeId);
-    seatsRequest.input('rapId', sql.Int, showtime.rapId);
-    seatsRequest.input('soPhong', sql.VarChar(10), showtime.room);
-    
-    const seatsQuery = `
-      SELECT 
-        g.HangGhe as row,
-        g.SoGhe as col,
-        g.LoaiGhe as type,
-        CASE 
-          WHEN v.ID IS NOT NULL AND v.TrangThai IN ('DaThanhToan', 'GiuCho') THEN 
-            CASE 
-              WHEN v.TrangThai = 'DaThanhToan' THEN 'booked'
-              WHEN v.TrangThai = 'GiuCho' THEN 'processing'
-            END
-          ELSE 'available'
-        END as status,
-        CONCAT(g.HangGhe, g.SoGhe) as id,
-        ISNULL(
-          (SELECT TOP 1 gv.DonGia 
-           FROM GiaVe gv 
-           WHERE gv.DinhDangPhim = @format
-             AND gv.LoaiGhe = g.LoaiGhe
-             AND gv.LoaiSuatChieu = CASE 
-               WHEN DATEPART(WEEKDAY, @startTime) IN (1, 7) THEN 'CuoiTuan'
-               ELSE 'NgayThuong'
-             END
-             AND gv.TrangThai = 'ConHieuLuc'
-             AND (gv.NgayBatDauApDung IS NULL OR gv.NgayBatDauApDung <= CAST(@startTime AS DATE))
-             AND (gv.NgayKetThucApDung IS NULL OR gv.NgayKetThucApDung >= CAST(@startTime AS DATE))
-           ORDER BY gv.ID DESC
-          ), 
-          CASE 
-            WHEN g.LoaiGhe = 'VIP' THEN 100000
-            WHEN g.LoaiGhe = 'Doi' THEN 160000
-            ELSE 80000
-          END
-        ) as price
-      FROM Ghe g
-      LEFT JOIN Ve v ON g.Rap_ID = v.Rap_ID 
-        AND g.SoPhong = v.SoPhong 
-        AND g.HangGhe = v.HangGhe 
-        AND g.SoGhe = v.SoGhe 
-        AND v.SuatChieu_ID = @showtimeId
-        AND v.TrangThai <> 'DaHuy'
-      WHERE g.Rap_ID = @rapId 
-        AND g.SoPhong = @soPhong
-      ORDER BY g.HangGhe, g.SoGhe
-    `;
-    
-    seatsRequest.input('format', sql.VarChar(10), showtime.format);
-    seatsRequest.input('startTime', sql.DateTime, showtime.startTime);
-    
-    const seatsResult = await seatsRequest.query(seatsQuery);
-    
-    res.json({
-      showtime: showtime,
-      seats: seatsResult.recordset
+    const seats = result.recordset.map(seat => {
+      let status = 'available';
+      if (seat.TrangThai === 'DaBan') status = 'booked';
+      else if (seat.TrangThai === 'DangGiu') status = 'processing';
+
+      let basePrice = 80000; 
+      if (showtime.LoaiPhong === 'IMAX') basePrice = 180000;
+      else if (showtime.LoaiPhong === '4DX') basePrice = 200000;
+      else if (showtime.LoaiPhong === '3D') basePrice = 120000;
+
+      let finalPrice = basePrice;
+      if (seat.LoaiGhe === 'VIP') finalPrice += 20000;
+      else if (seat.LoaiGhe === 'Doi') finalPrice = basePrice * 2; 
+
+      return {
+        id: `${seat.HangGhe}${seat.SoGhe}`, // ID ghế: A1, B2...
+        row: seat.HangGhe,
+        col: parseInt(seat.SoGhe),
+        type: seat.LoaiGhe, // 'Thuong', 'VIP', 'Doi'
+        status: status,
+        price: finalPrice
+      };
     });
-  } catch (err) {
-    console.error('Lỗi khi lấy sơ đồ ghế:', err);
-    res.status(500).json({ message: 'Lỗi server khi lấy sơ đồ ghế.' });
+      
+    res.json({ 
+      showtime: {
+        id: showtime.ID,
+        movieName: showtime.TenPhim,
+        format: showtime.LoaiPhong,
+        startTime: showtime.ThoiGianBatDau
+      },
+      seats: seats 
+    });
+
+  } catch (err) { 
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server: ' + err.message }); 
   }
 });
 
-// POST /booking/voucher/apply - Áp dụng voucher
-router.post('/voucher/apply', async (req, res) => {
+// GET /booking/products
+router.get('/products', async (req, res) => {
   try {
     const pool = getPool();
-    const request = pool.request();
-    const { code, total } = req.body;
-    
-    if (!code || !total) {
-      return res.status(400).json({ message: 'Thiếu thông tin mã giảm giá hoặc tổng tiền.' });
+    const result = await pool.request().query(`
+      SELECT ID as id, TenSP as name, DonGia as price, PhanLoai as category, TonKho as stock 
+      FROM SanPham WHERE TonKho > 0
+    `);
+    res.json(result.recordset);
+  } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
+});
+
+// POST /booking/create - Tạo đơn đặt vé và giữ chỗ
+router.post('/create', async (req, res) => {
+  const { KhachHang_ID, SuatChieu_ID, DanhSachGhe, DanhSachSanPham } = req.body;
+  const pool = getPool();
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin();
+
+    const gheTable = new sql.Table('GheDatType'); // Type trong SQL
+    gheTable.columns.add('HangGhe', sql.VarChar(5));
+    gheTable.columns.add('SoGhe', sql.VarChar(5));
+    DanhSachGhe.forEach(g => {
+            const hang = g.HangGhe || g.row; 
+            const so = g.SoGhe || g.col || g.number;
+
+            if (hang === undefined || so === undefined) {
+                console.error("DỮ LIỆU GHẾ BỊ LỖI (UNDEFINED):", g);
+                throw new Error("Dữ liệu ghế không hợp lệ (Thiếu HangGhe hoặc SoGhe)");
+            }
+
+            gheTable.rows.add(String(hang), String(so));
+        });
+
+    const reqSP = new sql.Request(transaction);
+    reqSP.input('KhachHang_ID', sql.Int, KhachHang_ID || null);
+    reqSP.input('SuatChieu_ID', sql.Int, SuatChieu_ID);
+    reqSP.input('DanhSachGhe', gheTable);
+
+    const spResult = await reqSP.execute('sp_DatVe_TaoHoaDon');
+    const hoaDonId = spResult.recordset[0].HoaDonID; 
+
+    if (!hoaDonId) {
+        throw new Error("Lỗi: Stored Procedure không trả về HoaDonID.");
     }
-    
-    const query = `
-      SELECT 
-        ID as voucherId,
-        MaGiam as code,
-        Loai as type,
-        MucGiam as amount,
-        CASE 
-          WHEN Loai = 'PhanTram' THEN (@total * MucGiam / 100)
-          ELSE MucGiam
-        END as discountValue
-      FROM Voucher
-      WHERE MaGiam = @code 
-        AND SoLuong > 0
-    `;
-    
-    request.input('code', sql.VarChar(20), code);
-    request.input('total', sql.Decimal(10, 2), total);
-    
-    const result = await request.query(query);
-    
-    if (result.recordset.length === 0) {
-      return res.status(404).json({ message: 'Mã giảm giá không hợp lệ hoặc đã hết lượt sử dụng.' });
+
+    if (DanhSachSanPham && DanhSachSanPham.length > 0) {
+      for (const p of DanhSachSanPham) {
+        if (!p.SanPham_ID || !p.SoLuong) {
+            console.error("Dữ liệu sản phẩm lỗi (Item):", p);
+            throw new Error("Dữ liệu sản phẩm không hợp lệ (Thiếu SanPham_ID hoặc SoLuong).");
+        }
+        
+        const reqProd = new sql.Request(transaction);
+        // Check tồn kho & lấy giá
+        const stockCheck = await reqProd.query(`
+          SELECT DonGia, TonKho, TenSP FROM SanPham WITH (UPDLOCK) WHERE ID = ${p.SanPham_ID}
+        `);
+        
+        if (stockCheck.recordset.length === 0) throw new Error(`Sản phẩm ID ${p.SanPham_ID} không tồn tại.`);
+        const { DonGia, TonKho, TenSP } = stockCheck.recordset[0];
+
+        if (TonKho < p.SoLuong) throw new Error(`Sản phẩm ${TenSP} không đủ hàng.`);
+
+        // Insert vào HoaDon_SanPham và Trừ kho
+        await reqProd.query(`
+          INSERT INTO HoaDon_SanPham (HoaDon_ID, SanPham_ID, SoLuong, DonGiaLucBan)
+          VALUES (${hoaDonId}, ${p.SanPham_ID}, ${p.SoLuong}, ${DonGia});
+          UPDATE SanPham SET TonKho = TonKho - ${p.SoLuong} WHERE ID = ${p.SanPham_ID};
+        `);
+      }
     }
-    
-    res.json(result.recordset[0]);
+
+    await transaction.commit();
+    res.json({ message: 'Giữ chỗ thành công', hoaDonId: hoaDonId });
+
   } catch (err) {
-    console.error('Lỗi khi áp dụng voucher:', err);
-    res.status(500).json({ message: 'Lỗi server khi áp dụng voucher.' });
+    if (transaction._begun) await transaction.rollback();
+    console.error("Booking Error:", err);
+    const msg = err.message.includes('đã có người đặt') 
+      ? 'Một trong các ghế bạn chọn vừa có người đặt. Vui lòng chọn lại.' 
+      : err.message;
+    res.status(400).json({ message: msg });
   }
 });
 
-// POST /booking/checkout - Thanh toán đặt vé
-router.post('/checkout', async (req, res) => {
-  const transaction = new sql.Transaction(getPool());
+// POST /booking/confirm
+router.post('/confirm', async (req, res) => {
+  const { hoaDonId, paymentMethod, voucherCode, guestInfo } = req.body;
+  try {
+    const pool = getPool();
+    const reqSP = pool.request();
+    reqSP.input('HoaDon_ID', sql.Int, hoaDonId);
+    reqSP.input('PhuongThucThanhToan', sql.VarChar(50), paymentMethod || 'TienMat');
+    reqSP.input('MaVoucher', sql.VarChar(20), voucherCode || null);
+
+    const result = await reqSP.execute('sp_XacNhanThanhToan');
+    
+    res.json({ 
+      message: 'Thanh toán thành công!',
+      data: result.recordset[0] 
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// POST /booking/cancel
+router.post('/cancel', async (req, res) => {
+  const { hoaDonId } = req.body;
+  if(!hoaDonId) return res.status(400).json({message: 'Thiếu ID'});
+
+  const pool = getPool();
+  const transaction = new sql.Transaction(pool);
   
   try {
     await transaction.begin();
-    
-    const { customerId, showtimeId, seats, products, voucherCode, paymentMethod } = req.body;
-    
-    if (!showtimeId || !seats || seats.length === 0 || !paymentMethod) {
-      await transaction.rollback();
-      return res.status(400).json({ message: 'Thiếu thông tin đặt vé.' });
+    const reqSql = new sql.Request(transaction);
+
+    // Hoàn kho sản phẩm trước
+    const prods = await reqSql.query(`SELECT SanPham_ID, SoLuong FROM HoaDon_SanPham WHERE HoaDon_ID = ${hoaDonId}`);
+    for (const p of prods.recordset) {
+      await reqSql.query(`UPDATE SanPham SET TonKho = TonKho + ${p.SoLuong} WHERE ID = ${p.SanPham_ID}`);
     }
-    
-    // Lấy thông tin suất chiếu
-    const showtimeRequest = new sql.Request(transaction);
-    showtimeRequest.input('showtimeId', sql.Int, showtimeId);
-    
-    const showtimeQuery = `
-      SELECT 
-        sc.ID,
-        sc.Rap_ID,
-        sc.SoPhong,
-        sc.TrangThai,
-        r.TenRap as rapName,
-        sc.ThoiGianBatDau as startTime,
-        pc.LoaiPhong as format,
-        p.TenPhim as movieName
-      FROM SuatChieu sc
-      INNER JOIN Rap r ON sc.Rap_ID = r.ID
-      INNER JOIN Phim p ON sc.Phim_ID = p.ID
-      INNER JOIN PhongChieu pc ON sc.Rap_ID = pc.Rap_ID AND sc.SoPhong = pc.SoPhong
-      WHERE sc.ID = @showtimeId
-    `;
-    
-    const showtimeResult = await showtimeRequest.query(showtimeQuery);
-    
-    if (showtimeResult.recordset.length === 0) {
-      await transaction.rollback();
-      return res.status(404).json({ message: 'Không tìm thấy suất chiếu.' });
-    }
-    
-    const showtime = showtimeResult.recordset[0];
-    
-    if (showtime.TrangThai !== 'DangMo') {
-      await transaction.rollback();
-      return res.status(400).json({ message: 'Suất chiếu không còn mở.' });
-    }
-    
-    // Kiểm tra ghế có sẵn không
-    for (const seat of seats) {
-      const checkSeatRequest = new sql.Request(transaction);
-      checkSeatRequest.input('rapId', sql.Int, showtime.Rap_ID);
-      checkSeatRequest.input('soPhong', sql.VarChar(10), showtime.SoPhong);
-      checkSeatRequest.input('hangGhe', sql.VarChar(5), seat.row);
-      checkSeatRequest.input('soGhe', sql.VarChar(5), seat.number.toString());
-      checkSeatRequest.input('showtimeId', sql.Int, showtimeId);
-      
-      const checkSeatQuery = `
-        SELECT g.LoaiGhe, v.ID as VeID, v.TrangThai
-        FROM Ghe g
-        LEFT JOIN Ve v ON g.Rap_ID = v.Rap_ID 
-          AND g.SoPhong = v.SoPhong 
-          AND g.HangGhe = v.HangGhe 
-          AND g.SoGhe = v.SoGhe 
-          AND v.SuatChieu_ID = @showtimeId
-          AND v.TrangThai <> 'DaHuy'
-        WHERE g.Rap_ID = @rapId 
-          AND g.SoPhong = @soPhong 
-          AND g.HangGhe = @hangGhe 
-          AND g.SoGhe = @soGhe
-      `;
-      
-      const checkResult = await checkSeatRequest.query(checkSeatQuery);
-      
-      if (checkResult.recordset.length === 0) {
-        await transaction.rollback();
-        return res.status(400).json({ message: `Ghế ${seat.row}${seat.number} không tồn tại.` });
-      }
-      
-      const seatInfo = checkResult.recordset[0];
-      
-      if (seatInfo.VeID && (seatInfo.TrangThai === 'DaThanhToan' || seatInfo.TrangThai === 'GiuCho')) {
-        await transaction.rollback();
-        return res.status(400).json({ message: `Ghế ${seat.row}${seat.number} đã được đặt.` });
-      }
-    }
-    
-    // Tạo hóa đơn
-    const createInvoiceRequest = new sql.Request(transaction);
-    createInvoiceRequest.input('khachHangId', sql.Int, customerId || null);
-    createInvoiceRequest.input('trangThai', sql.VarChar(20), 'DaThanhToan');
-    createInvoiceRequest.input('phuongThuc', sql.VarChar(50), paymentMethod);
-    
-    const createInvoiceQuery = `
-      INSERT INTO HoaDon (KhachHang_ID, TrangThaiThanhToan, PhuongThucThanhToan)
-      OUTPUT INSERTED.ID
-      VALUES (@khachHangId, @trangThai, @phuongThuc)
-    `;
-    
-    const invoiceResult = await createInvoiceRequest.query(createInvoiceQuery);
-    const invoiceId = invoiceResult.recordset[0].ID;
-    
-    // Tạo mã booking
-    const bookingCode = `BK${invoiceId.toString().padStart(6, '0')}`;
-    
-    let ticketTotal = 0;
-    const ticketDetails = [];
-    
-    // Tạo vé cho từng ghế
-    for (const seat of seats) {
-      const createTicketRequest = new sql.Request(transaction);
-      createTicketRequest.input('hoaDonId', sql.Int, invoiceId);
-      createTicketRequest.input('suatChieuId', sql.Int, showtimeId);
-      createTicketRequest.input('rapId', sql.Int, showtime.Rap_ID);
-      createTicketRequest.input('soPhong', sql.VarChar(10), showtime.SoPhong);
-      createTicketRequest.input('hangGhe', sql.VarChar(5), seat.row);
-      createTicketRequest.input('soGhe', sql.VarChar(5), seat.number.toString());
-      createTicketRequest.input('format', sql.VarChar(10), showtime.format);
-      createTicketRequest.input('startTime', sql.DateTime, showtime.startTime);
-      
-      // Lấy giá vé và loại ghế
-      const priceQuery = `
-        SELECT 
-          g.LoaiGhe,
-          ISNULL(
-            (SELECT TOP 1 gv.DonGia 
-             FROM GiaVe gv 
-             WHERE gv.DinhDangPhim = @format
-               AND gv.LoaiGhe = g.LoaiGhe
-               AND gv.LoaiSuatChieu = CASE 
-                 WHEN DATEPART(WEEKDAY, @startTime) IN (1, 7) THEN 'CuoiTuan'
-                 ELSE 'NgayThuong'
-               END
-               AND gv.TrangThai = 'ConHieuLuc'
-               AND (gv.NgayBatDauApDung IS NULL OR gv.NgayBatDauApDung <= CAST(@startTime AS DATE))
-               AND (gv.NgayKetThucApDung IS NULL OR gv.NgayKetThucApDung >= CAST(@startTime AS DATE))
-             ORDER BY gv.ID DESC
-            ), 
-            CASE 
-              WHEN g.LoaiGhe = 'VIP' THEN 100000
-              WHEN g.LoaiGhe = 'Doi' THEN 160000
-              ELSE 80000
-            END
-          ) as GiaVe
-        FROM Ghe g
-        WHERE g.Rap_ID = @rapId 
-          AND g.SoPhong = @soPhong 
-          AND g.HangGhe = @hangGhe 
-          AND g.SoGhe = @soGhe
-      `;
-      
-      const priceResult = await createTicketRequest.query(priceQuery);
-      const { LoaiGhe, GiaVe } = priceResult.recordset[0];
-      
-      // Tạo vé
-      const createTicketQuery = `
-        INSERT INTO Ve (HoaDon_ID, SuatChieu_ID, Rap_ID, SoPhong, HangGhe, SoGhe, DonGiaLucBan, TrangThai)
-        VALUES (@hoaDonId, @suatChieuId, @rapId, @soPhong, @hangGhe, @soGhe, @giaVe, 'DaThanhToan')
-      `;
-      
-      createTicketRequest.input('giaVe', sql.Decimal(10, 2), GiaVe);
-      await createTicketRequest.query(createTicketQuery);
-      
-      ticketTotal += parseFloat(GiaVe);
-      ticketDetails.push({
-        seatCode: `${seat.row}${seat.number}`,
-        price: parseFloat(GiaVe),
-        seatType: LoaiGhe
-      });
-    }
-    
-    let productTotal = 0;
-    const productDetails = [];
-    
-    // Thêm sản phẩm vào hóa đơn
-    if (products && products.length > 0) {
-      for (const product of products) {
-        const addProductRequest = new sql.Request(transaction);
-        addProductRequest.input('hoaDonId', sql.Int, invoiceId);
-        addProductRequest.input('productId', sql.Int, product.productId);
-        addProductRequest.input('quantity', sql.Int, product.quantity);
-        
-        // Lấy thông tin sản phẩm
-        const productQuery = `
-          SELECT ID, TenSP, DonGia, TonKho
-          FROM SanPham
-          WHERE ID = @productId
-        `;
-        
-        const productResult = await addProductRequest.query(productQuery);
-        
-        if (productResult.recordset.length === 0) {
-          await transaction.rollback();
-          return res.status(404).json({ message: `Sản phẩm ${product.productId} không tồn tại.` });
-        }
-        
-        const productInfo = productResult.recordset[0];
-        
-        if (productInfo.TonKho < product.quantity) {
-          await transaction.rollback();
-          return res.status(400).json({ message: `Sản phẩm ${productInfo.TenSP} không đủ số lượng.` });
-        }
-        
-        // Thêm sản phẩm vào hóa đơn
-        const addProductQuery = `
-          INSERT INTO HoaDon_SanPham (HoaDon_ID, SanPham_ID, SoLuong, DonGiaLucBan)
-          VALUES (@hoaDonId, @productId, @quantity, @price)
-        `;
-        
-        addProductRequest.input('price', sql.Decimal(10, 2), productInfo.DonGia);
-        await addProductRequest.query(addProductQuery);
-        
-        // Cập nhật tồn kho
-        const updateStockQuery = `
-          UPDATE SanPham
-          SET TonKho = TonKho - @quantity
-          WHERE ID = @productId
-        `;
-        
-        await addProductRequest.query(updateStockQuery);
-        
-        const itemTotal = parseFloat(productInfo.DonGia) * product.quantity;
-        productTotal += itemTotal;
-        productDetails.push({
-          id: productInfo.ID,
-          name: productInfo.TenSP,
-          price: parseFloat(productInfo.DonGia),
-          quantity: product.quantity
-        });
-      }
-    }
-    
-    // Áp dụng voucher nếu có
-    let discount = 0;
-    let voucherInfo = null;
-    
-    if (voucherCode) {
-      const voucherRequest = new sql.Request(transaction);
-      voucherRequest.input('code', sql.VarChar(20), voucherCode);
-      
-      const voucherQuery = `
-        SELECT ID, MaGiam, Loai, MucGiam, SoLuong
-        FROM Voucher
-        WHERE MaGiam = @code AND SoLuong > 0
-      `;
-      
-      const voucherResult = await voucherRequest.query(voucherQuery);
-      
-      if (voucherResult.recordset.length > 0) {
-        const voucher = voucherResult.recordset[0];
-        const subtotal = ticketTotal + productTotal;
-        
-        if (voucher.Loai === 'PhanTram') {
-          discount = subtotal * voucher.MucGiam / 100;
-        } else {
-          discount = voucher.MucGiam;
-        }
-        
-        // Cập nhật voucher vào hóa đơn
-        const updateVoucherQuery = `
-          UPDATE HoaDon
-          SET Voucher_ID = @voucherId
-          WHERE ID = @hoaDonId
-        `;
-        
-        voucherRequest.input('voucherId', sql.Int, voucher.ID);
-        voucherRequest.input('hoaDonId', sql.Int, invoiceId);
-        await voucherRequest.query(updateVoucherQuery);
-        
-        // Giảm số lượng voucher
-        const decreaseVoucherQuery = `
-          UPDATE Voucher
-          SET SoLuong = SoLuong - 1
-          WHERE ID = @voucherId
-        `;
-        
-        await voucherRequest.query(decreaseVoucherQuery);
-        
-        voucherInfo = {
-          id: voucher.ID,
-          code: voucher.MaGiam,
-          type: voucher.Loai
-        };
-      }
-    }
-    
-    // Cộng điểm tích lũy cho khách hàng (nếu có)
-    if (customerId) {
-      const total = ticketTotal + productTotal - discount;
-      const pointsToAdd = Math.floor(total / 1000); // 1 điểm cho mỗi 1000đ
-      
-      if (pointsToAdd > 0) {
-        const updatePointsRequest = new sql.Request(transaction);
-        updatePointsRequest.input('customerId', sql.Int, customerId);
-        updatePointsRequest.input('points', sql.Int, pointsToAdd);
-        
-        const updatePointsQuery = `
-          UPDATE KhachHang
-          SET DiemTichLuy = DiemTichLuy + @points
-          WHERE NguoiDung_ID = @customerId
-        `;
-        
-        await updatePointsRequest.query(updatePointsQuery);
-      }
-    }
-    
+
+    // Cập nhật trạng thái hủy
+    await reqSql.query(`
+      UPDATE HoaDon SET TrangThaiThanhToan = 'DaHuy' WHERE ID = ${hoaDonId};
+      UPDATE Ve SET TrangThai = 'DaHuy' WHERE HoaDon_ID = ${hoaDonId};
+    `);
+
     await transaction.commit();
-    
-    const subtotal = ticketTotal + productTotal;
-    const total = subtotal - discount;
-    
-    res.status(201).json({
-      invoiceId: invoiceId,
-      bookingCode: bookingCode,
-      subtotal: subtotal,
-      ticketTotal: ticketTotal,
-      productTotal: productTotal,
-      discount: discount,
-      total: total,
-      voucher: voucherInfo,
-      tickets: ticketDetails,
-      products: productDetails,
-      showtime: {
-        id: showtime.ID,
-        rapId: showtime.Rap_ID,
-        rapName: showtime.rapName,
-        room: showtime.SoPhong,
-        startTime: showtime.startTime,
-        format: showtime.format,
-        movieName: showtime.movieName
-      }
-    });
-    
-  } catch (err) {
-    await transaction.rollback();
-    console.error('Lỗi khi thanh toán:', err);
-    res.status(500).json({ message: 'Lỗi server khi thanh toán: ' + err.message });
+    res.json({ message: 'Đã hủy đơn hàng' });
+  } catch(err) {
+    if (transaction._begun) await transaction.rollback();
+    res.status(500).json({ message: err.message });
   }
+});
+
+// POST /booking/voucher/check - Kiểm tra voucher
+router.post('/voucher/check', async (req, res) => {
+  try {
+    const { code } = req.body;
+    const pool = getPool();
+    const result = await pool.request()
+      .input('code', sql.VarChar(20), code)
+      .query(`SELECT * FROM Voucher WHERE MaGiam = @code AND SoLuong > 0`);
+    
+    if (result.recordset.length === 0) return res.status(404).json({ message: 'Voucher không hợp lệ' });
+    res.json(result.recordset[0]);
+  } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 });
 
 module.exports = router;

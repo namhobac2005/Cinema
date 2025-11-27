@@ -55,7 +55,13 @@ export default function App() {
   if (!currentUser) {
     //Nếu click Continue as Guest => chuyển sang GuestDashboard
     if (currentPage === 'guestdashboard') {
-      return <GuestDashboard onBackToLogin={handleLogout} />;
+      return (
+        <CustomerBooking 
+          onLogout={() => {
+             setCurrentPage('dashboard'); 
+          }} 
+        />
+      );
     }
 
     //Ngược lại vẫn ở login/register form
