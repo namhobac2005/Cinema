@@ -48,7 +48,7 @@ Dự án được thực hiện trong khuôn khổ môn học **Hệ Cơ Sở D�
 
 ### Bước 1: Khởi tạo Cơ sở dữ liệu
 1.  Mở SQL Server Management Studio (SSMS).
-2.  Chạy file script `Database_Script.sql` (nằm trong thư mục `database/` hoặc `sql/`).
+2.  Chạy lần lượt file script `CREATE_DATABASE_CINEMA.sql` và `insert_Cinema.sql` (nằm trong thư mục `backend/shared/`).
 3.  **Lưu ý quan trọng:** Script sẽ tạo một User SQL tên là `sManager` với quyền `db_owner`. Đảm bảo ứng dụng kết nối bằng user này để đảm bảo bảo mật.
     * User: `sManager`
     * Pass: `pass123` (hoặc mật khẩu trong script).
