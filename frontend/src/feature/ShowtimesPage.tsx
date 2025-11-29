@@ -58,7 +58,9 @@ interface Movie {
   id: number;
   name: string;
 }
-
+const formatID = (id: number, prefix: string) => {
+  return `${prefix}${id.toString().padStart(4, '0')}`;
+};
 export default function ShowtimesPage() {
   const [cinemas, setCinemas] = useState<Cinema[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -459,7 +461,7 @@ export default function ShowtimesPage() {
                     <div className="flex items-center gap-2">
                       <Film className="w-4 h-4" style={{ color: '#9CA3AF' }} />
                       <span style={{ color: '#E5E7EB' }}>
-                        ID Suất: {showtime.showtimeId}
+                        ID Suất: {formatID(showtime.showtimeId,'SC')}
                       </span>
                     </div>
                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#8B5CF6]/20">

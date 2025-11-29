@@ -237,7 +237,7 @@ router.get('/tables/all-movies', async (req, res) => {
 router.get('/tables/recent-invoices', async (req, res) => {
   const pool = getPool();
   const result = await pool.request().query(`
-    SELECT TOP 5 '#INV-' + CAST(h.ID AS VARCHAR) AS id,
+    SELECT TOP 5 CAST(h.ID AS VARCHAR) AS id,
     ISNULL(nd.HovaTendem + ' ' + nd.Ten, N'Khách vãng lai') AS customer,
     (ISNULL((SELECT SUM(GiaVeBan) FROM Ve v WHERE v.HoaDon_ID = h.ID), 0) + dbo.fn_TinhTongTienSanPham(h.ID)) AS amount,
     h.ThoiGianTao AS date, h.TrangThaiThanhToan AS status
@@ -251,7 +251,7 @@ router.get('/tables/recent-invoices', async (req, res) => {
 router.get('/tables/all-invoices', async (req, res) => {
   const pool = getPool();
   const result = await pool.request().query(`
-    SELECT '#INV-' + CAST(h.ID AS VARCHAR) AS id,
+    SELECT CAST(h.ID AS VARCHAR) AS id,
     ISNULL(nd.HovaTendem + ' ' + nd.Ten, N'Khách vãng lai') AS customer,
     (ISNULL((SELECT SUM(GiaVeBan) FROM Ve v WHERE v.HoaDon_ID = h.ID), 0) + dbo.fn_TinhTongTienSanPham(h.ID)) AS amount,
     h.ThoiGianTao AS date, h.TrangThaiThanhToan AS status

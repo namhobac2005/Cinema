@@ -42,7 +42,9 @@ interface ComboProduct extends BaseProduct {
 }
 
 type Product = FoodProduct | DrinkProduct | ComboProduct;
-
+const formatID = (id: number, prefix: string) => {
+  return `${prefix}${id.toString().padStart(4, '0')}`;
+};
 export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -487,7 +489,7 @@ export default function ProductsPage() {
             <TableBody>
               {filteredProducts.map((product) => (
                 <TableRow key={product.id} className="border-[#8B5CF6]/20">
-                  <TableCell className="text-[#8B5CF6] font-medium">{product.id}</TableCell>
+                  <TableCell className="text-[#8B5CF6] font-medium">{formatID(product.id,'SP')}</TableCell>
                   <TableCell className="text-slate-200 font-medium">{product.name}</TableCell>
                   <TableCell>{getCategoryBadge(product.category)}</TableCell>
                   <TableCell className="text-[#FFC107]">
