@@ -62,7 +62,9 @@ interface Movie {
   PosterURL: string;
   AgeLimit: number;
 }
-
+ const formatID = (id: number, prefix: string) => {
+  return `${prefix}${id.toString().padStart(4, '0')}`;
+};
 export default function MoviesList() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -554,7 +556,7 @@ export default function MoviesList() {
             <TableBody>
               {filteredMovies.map((movie) => (
                 <TableRow key={movie.id} className="border-[#8B5CF6]/20">
-                  <TableCell style={{ color: '#8B5CF6' }}>{movie.id}</TableCell>
+                  <TableCell style={{ color: '#8B5CF6' }}>{formatID(movie.id,'PH')}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Film className="w-4 h-4" style={{ color: '#FFC107' }} />

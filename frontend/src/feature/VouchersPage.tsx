@@ -51,7 +51,9 @@ interface Voucher {
   MucGiam: number;
   SoLuong: number;
 }
-
+const formatID = (id: number, prefix: string) => {
+  return `${prefix}${id.toString().padStart(4, '0')}`;
+};
 export default function VouchersPage() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]); 
   const [loading, setLoading] = useState(false); // Thêm loading state
@@ -418,7 +420,7 @@ export default function VouchersPage() {
               {!loading && filteredVouchers.map((voucher) => (
                 <TableRow key={voucher.ID} className="border-[#8B5CF6]/20">
                   <TableCell style={{ color: '#8B5CF6' }}>
-                    {voucher.ID}
+                    {formatID(voucher.ID,'VC')}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

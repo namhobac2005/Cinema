@@ -78,7 +78,9 @@ const formatCurrency = (value: number) => {
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('vi-VN');
 };
-
+const formatID = (id: string, prefix: string) => {
+  return `${prefix}${id.padStart(4, '0')}`;
+};
 export default function Dashboard() {
   const [revMonth, setRevMonth] = useState<IStatWithTrend | null>(null);
   const [tickMonth, setTickMonth] = useState<IStatWithTrend | null>(null);
@@ -383,7 +385,7 @@ export default function Dashboard() {
               <TableBody>
                 {recentInvoices.map((invoice) => (
                   <TableRow key={invoice.id} className="border-[#8B5CF6]/20">
-                    <TableCell style={{ color: '#8B5CF6' }}>{invoice.id}</TableCell>
+                    <TableCell style={{ color: '#8B5CF6' }}>{formatID(invoice.id, 'HD')}</TableCell>
                     <TableCell>
                       <div>
                         <p style={{ color: '#E5E7EB' }}>{invoice.customer}</p>

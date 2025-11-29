@@ -27,7 +27,9 @@ interface Employee {
   joinDate: string;
   salary: number;
 }
-
+const formatID = (id: number, prefix: string) => {
+  return `${prefix}${id.toString().padStart(4, '0')}`;
+};
 export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("customers");
@@ -525,7 +527,7 @@ export default function UsersPage() {
                   {filteredCustomers.map((customer) => (
                     <TableRow key={customer.id} className="border-[#8B5CF6]/20">
                       <TableCell style={{ color: "#8B5CF6" }}>
-                        {customer.id}
+                        {formatID(customer.id,'ND')}
                       </TableCell>
                       <TableCell style={{ color: "#E5E7EB" }}>
                         {customer.name}
@@ -746,7 +748,7 @@ export default function UsersPage() {
                   {filteredEmployees.map((employee) => (
                     <TableRow key={employee.id} className="border-[#8B5CF6]/20">
                       <TableCell style={{ color: "#8B5CF6" }}>
-                        {employee.id}
+                        {formatID(employee.id, 'ND')}
                       </TableCell>
                       <TableCell style={{ color: "#E5E7EB" }}>
                         {employee.name}

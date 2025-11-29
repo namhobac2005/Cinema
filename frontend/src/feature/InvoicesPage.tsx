@@ -32,6 +32,9 @@ interface Invoice {
   items: InvoiceItem[];
 }
 
+const formatID = (id: number, prefix: string) => {
+  return `${prefix}${id.toString().padStart(4, '0')}`;
+};
 export default function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -220,7 +223,7 @@ export default function InvoicesPage() {
             <TableBody>
               {filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id} className="border-[#8B5CF6]/20">
-                  <TableCell className="text-[#8B5CF6]">{invoice.id}</TableCell>
+                  <TableCell className="text-[#8B5CF6]">{formatID(invoice.id,'HD')}</TableCell>
                   <TableCell className="text-gray-400">{invoice.createdAt}</TableCell>
                   <TableCell className="text-gray-200">{invoice.customerName ?? "—"}</TableCell>
                   <TableCell className="text-gray-200">{invoice.employeeName ?? "—"}</TableCell>

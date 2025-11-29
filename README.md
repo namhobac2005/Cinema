@@ -82,8 +82,7 @@ Hệ thống sử dụng API của The Movie Database để lấy metadata phim.
 cd backend
 npm install
 npm run start
-```
-**Frontend:**
+```**Frontend:**
 ```bash
 cd frontend
 npm install
