@@ -13,7 +13,6 @@ import GuestDashboard from './feature/Guest-Dashboard';
 
 import { getCurrentUser, logout, User } from './api/auth';
 
-
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -55,13 +54,7 @@ export default function App() {
   if (!currentUser) {
     //Nếu click Continue as Guest => chuyển sang GuestDashboard
     if (currentPage === 'guestdashboard') {
-      return (
-        <CustomerBooking 
-          onLogout={() => {
-             setCurrentPage('dashboard'); 
-          }} 
-        />
-      );
+      return <GuestDashboard onBackToLogin={handleLogout} />;
     }
 
     //Ngược lại vẫn ở login/register form
@@ -69,14 +62,14 @@ export default function App() {
       <AuthPage
         onLogin={handleLogin}
         onGuestContinue={() => {
-          console.log("GOTO GUEST MODE");
+          console.log('GOTO GUEST MODE');
           logout();
           setCurrentUser(null);
           setIsRegistering(false);
           setCurrentPage('guestdashboard');
         }}
         isRegistering={isRegistering}
-        onToggleRegister={() => setIsRegistering(prev => !prev)}
+        onToggleRegister={() => setIsRegistering((prev) => !prev)}
       />
     );
   }
@@ -85,15 +78,24 @@ export default function App() {
   if (currentUser.vaiTro === 'QuanLy') {
     const ManagerPage = () => {
       switch (currentPage) {
-        case 'dashboard': return <Dashboard />;
-        case 'guestdashboard': return <GuestDashboard />;
-        case 'movies': return <MoviesList />;
-        case 'products': return <ProductsPage />;
-        case 'invoices': return <InvoicesPage />;
-        case 'showtimes': return <ShowtimesPage />;
-        case 'vouchers': return <VouchersPage />;
-        case 'users': return <UsersPage />;
-        default: return <Dashboard />;
+        case 'dashboard':
+          return <Dashboard />;
+        case 'guestdashboard':
+          return <GuestDashboard />;
+        case 'movies':
+          return <MoviesList />;
+        case 'products':
+          return <ProductsPage />;
+        case 'invoices':
+          return <InvoicesPage />;
+        case 'showtimes':
+          return <ShowtimesPage />;
+        case 'vouchers':
+          return <VouchersPage />;
+        case 'users':
+          return <UsersPage />;
+        default:
+          return <Dashboard />;
       }
     };
 
@@ -115,7 +117,30 @@ export default function App() {
   }
 
   if (!currentUser && currentPage === 'guestdashboard') {
-  return <GuestDashboard onBackToLogin={() => setCurrentPage('dashboard')} />;
-}
+    return <GuestDashboard onBackToLogin={() => setCurrentPage('dashboard')} />;
+  }
 
+
+  //Debug khi token kh xóa
+  console.log('User Role hien tai:', currentUser.vaiTro); // Debug xem role là gì
+
+  return (
+    <div style={{ padding: 20, textAlign: 'center', color: 'white' }}>
+      <h1>Lỗi phân quyền</h1>
+      <p>
+        Xin chào <strong>{currentUser.Name || currentUser.username}</strong>
+      </p>
+      <p>
+        Vai trò hiện tại của bạn là:{' '}
+        <strong>{currentUser.Role || 'Chưa xác định'}</strong>
+      </p>
+      <p>Hệ thống không tìm thấy giao diện phù hợp cho vai trò này.</p>
+      <button
+        onClick={handleLogout}
+        style={{ padding: '10px 20px', cursor: 'pointer' }}
+      >
+        Đăng xuất
+      </button>
+    </div>
+  );
 }
