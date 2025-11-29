@@ -1,4 +1,4 @@
-﻿/*
+/*
 USE master;
 GO
 
@@ -451,6 +451,30 @@ CREATE TABLE HoaDon_SanPham (
 );
 GO
 
+-- 1. Bảng Người Dùng
+ALTER TABLE NguoiDung 
+ADD MaNguoiDung AS ('ND' + RIGHT('0000' + CAST(ID AS VARCHAR(10)), 4));
+GO
+-- 2. Bảng Phim (Movie)
+ALTER TABLE Phim 
+ADD MaPhim AS ('PH' + RIGHT('0000' + CAST(ID AS VARCHAR(10)), 4));
+GO
+-- 3. Bảng Hóa Đơn
+ALTER TABLE HoaDon 
+ADD MaHoaDon AS ('HD' + RIGHT('0000' + CAST(ID AS VARCHAR(10)), 4));
+GO
+-- 4. Bảng Rạp
+ALTER TABLE Rap 
+ADD MaRap AS ('RP' + RIGHT('0000' + CAST(ID AS VARCHAR(10)), 4));
+GO
+-- 5. Bảng Suất Chiếu
+ALTER TABLE SuatChieu 
+ADD MaSuatChieu AS ('SC' + RIGHT('0000' + CAST(ID AS VARCHAR(10)), 4));
+GO
+-- 6. Bảng Voucher
+ALTER TABLE Voucher
+ADD MaVoucher AS ('VC' + RIGHT('0000' + CAST(ID AS VARCHAR(10)), 4));
+GO
 ------ KẾT THÚC TẠO TABLE ------
 
 ----- Trigger ------
